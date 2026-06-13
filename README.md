@@ -1,5 +1,11 @@
 # scrypto-audit-kit
 
+[![lint](https://github.com/bigdevxrd/scrypto-audit-kit/actions/workflows/lint.yml/badge.svg)](https://github.com/bigdevxrd/scrypto-audit-kit/actions/workflows/lint.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Scrypto · Radix](https://img.shields.io/badge/Scrypto-Radix-052CC0)](https://docs.radixdlt.com/docs/scrypto-1)
+[![status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#limitations--read-this-before-relying-on-the-output)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 Pre-audit harness for [Scrypto](https://docs.radixdlt.com/docs/scrypto-1) blueprints on the Radix network. Runs an LLM-driven static analysis against a curated checklist + reference patterns, and produces a markdown findings report that you can hand to a human auditor (or use to fix issues yourself).
 
 This is a **pre-audit** tool, not an audit. It catches the kinds of issues a careful reviewer would catch on a first read so that paid auditors can spend their time on the harder, second-read findings. **It does not replace a human audit before mainnet deployment.**
