@@ -5,7 +5,7 @@
 #   make lint
 #   make help
 
-.PHONY: help audit lint refresh-refs check-deps
+.PHONY: help audit lint test refresh-refs check-deps
 
 help:
 	@echo "scrypto-audit-kit"
@@ -33,6 +33,10 @@ lint:
 	else \
 		echo "(markdownlint not installed — skipping md lint)"; \
 	fi
+
+test:
+	@command -v python3 >/dev/null || { echo "python3 required for tests"; exit 1; }
+	python3 -m unittest discover -s tests -t .
 
 check-deps:
 	@command -v aider     >/dev/null && echo "aider:     $$(aider --version)"        || echo "aider:     MISSING (pip install aider-chat)"
