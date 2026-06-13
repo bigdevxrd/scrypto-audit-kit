@@ -10,6 +10,8 @@ Pre-audit harness for [Scrypto](https://docs.radixdlt.com/docs/scrypto-1) bluepr
 
 This is a **pre-audit** tool, not an audit. It catches the kinds of issues a careful reviewer would catch on a first read so that paid auditors can spend their time on the harder, second-read findings. **It does not replace a human audit before mainnet deployment.**
 
+> **Where this fits** — the kit is the entry rung of a *trust ladder* that climbs from `cargo check` up to a full human audit (Hacken, Certik, …). The bigger plan — agentic audit→fix→verify loops, reproducible attested runs, and on-chain attestation — lives in **[VISION.md](VISION.md)**.
+
 ## What it does
 
 For each scrypto package you point it at, the kit:
