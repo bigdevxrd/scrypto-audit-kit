@@ -72,6 +72,54 @@ List, with citations:
 
 Things you couldn't determine from the code alone. Each item: one sentence, with a citation if there's a code anchor.
 
+### 7. Machine-readable appendix
+
+After the markdown report, emit **exactly one** fenced `json` code block — the same report in structured form, conforming to `schema/audit-report.schema.json`. Agents and the badge consume this; the markdown is a render of it.
+
+- Separate it from the prose with a `---` rule, then the line `<!-- machine-readable: do not edit -->`, then the block.
+- Reuse the **same `F-001…` ids, severities, checklist class names, and `path/file.rs:line` locations** as the markdown above. Severities and confidence are lowercase.
+- `checklist_coverage` must list **all eleven** classes (`status`: `clean` | `not_applicable` | `findings`).
+- Leave `kit` as `{}` and `target` minimal — the harness stamps authoritative provenance. If there are no findings, `findings` is `[]`.
+
+Emit it in exactly this shape:
+
+```json
+{
+  "schema_version": "1.0",
+  "kit": {},
+  "target": { "repo": "", "package": "" },
+  "summary": {
+    "overall_risk": "low",
+    "one_liner": "one sentence on what the blueprint does and its risk",
+    "asset_inventory": ["fungible vault: ... (src/lib.rs:NN)"],
+    "trust_boundaries": ["role `admin`: ... (src/lib.rs:NN)"],
+    "external_dependencies": ["Global<Oracle> at src/lib.rs:NN"]
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "high",
+      "class": "Auth bypass",
+      "location": "src/lib.rs:42",
+      "title": "short title",
+      "what": "one sentence",
+      "why": "one sentence on impact",
+      "suggested_direction": "remediation direction in prose — never a patch",
+      "confidence": "high",
+      "status": "open"
+    }
+  ],
+  "checklist_coverage": [
+    { "class": "Auth bypass", "status": "findings", "findings": ["F-001"] }
+  ],
+  "pattern_conformance": [
+    { "pattern": "name", "reference": "ignition-patterns.md", "present": "partial", "note": "one sentence" }
+  ],
+  "test_coverage_gaps": ["public method `foo` has zero tests (tests/...)"],
+  "open_questions": ["one sentence, with a citation if there's a code anchor"]
+}
+```
+
 ---
 
 ## Output rules — read carefully
@@ -81,8 +129,8 @@ Things you couldn't determine from the code alone. Each item: one sentence, with
 3. **Walk the checklist exhaustively** in §3. Every class must appear, marked NA, clean, or with finding references.
 4. **Be specific.** "Could be vulnerable to reentrancy" is useless. "Method `withdraw` (lib.rs:142) mutates `self.vault` after calling external `pool.swap`; a malicious pool callback could observe pre-mutation state" is useful.
 5. **Hedge appropriately.** If you're under 60% confident, say "low-confidence:" prefix on the finding and put it in §6 (Open questions) instead of §2 (Findings). Reserve §2 for things you're confident about.
-6. **No conclusion / "in summary" section.** §1 already serves as the executive summary. Stop after §6.
-7. **Pure markdown.** Use short code snippets (≤5 lines) only to illustrate a finding when prose alone is unclear. No giant code dumps.
+6. **No conclusion / "in summary" section.** §1 already serves as the executive summary. End the prose after §6, then emit the §7 JSON appendix as the very last thing in your response.
+7. **Pure markdown for the report body.** Use short code snippets (≤5 lines) only to illustrate a finding when prose alone is unclear. No giant code dumps. The one exception is the single §7 `json` block.
 8. **Start your response with `# Audit:` followed by the blueprint name** as the H1. The wrapper script uses that marker to strip aider's chrome.
 
 Begin the report now.

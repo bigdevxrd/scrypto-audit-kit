@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/schema/audit-report.schema.json",
+  "title": "scrypto-audit-kit pre-audit report",
+  "description": "Machine-readable form of a pre-audit report. The markdown report is a render of this. Agents consume this.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kit", "target", "summary", "findings", "checklist_coverage", "open_questions"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
+
+    "kit": {
+      "type": "object",
+      "description": "Authoritative provenance, stamped by the harness (not the model). This is what makes a run reproducible/attestable.",
+      "additionalProperties": false,
+      "required": ["version", "model", "checklist_version", "generated_at"],
+      "properties": {
+        "version": { "type": "string", "description": "kit version, e.g. 0.1.0 or 0.1.0+g1a2b3c4" },
+        "model": { "type": "string", "description": "analysis model, e.g. anthropic/claude-sonnet-4-6" },
+        "checklist_version": { "type": "string" },
+        "reference_set": { "type": "string", "description": "hash or marker of the references/ set loaded" },
+        "generated_at": { "type": "string", "description": "ISO date (UTC) the report was generated" }
+      }
+    },
+
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo", "package"],
+      "properties": {
+        "repo": { "type": "string" },
+        "package": { "type": "string" },
+        "source_hash": { "type": "string", "description": "sha256 of the concatenated analyzed source — the anchor an on-chain attestation binds to" },
+        "files_analyzed": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["overall_risk", "one_liner"],
+      "properties": {
+        "overall_risk": { "$ref": "#/$defs/severity" },
+        "one_liner": { "type": "string" },
+        "asset_inventory": { "type": "array", "items": { "type": "string" } },
+        "trust_boundaries": { "type": "array", "items": { "type": "string" } },
+        "external_dependencies": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "class", "location", "what", "why", "suggested_direction", "confidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^F-[0-9]{3}$" },
+          "severity": { "$ref": "#/$defs/severity" },
+          "class": { "type": "string", "description": "one of the checklist class names" },
+          "location": { "type": "string", "description": "path/to/file.rs:line" },
+          "title": { "type": "string" },
+          "what": { "type": "string" },
+          "why": { "type": "string" },
+          "suggested_direction": { "type": "string", "description": "remediation direction in prose — never a code patch" },
+          "confidence": { "enum": ["high", "medium", "low"] },
+          "status": { "enum": ["open", "fixed", "wontfix", "false_positive"], "default": "open" }
+        }
+      }
+    },
+
+    "checklist_coverage": {
+      "type": "array",
+      "description": "Every checklist class must appear exactly once — forces explicit coverage.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["class", "status"],
+        "properties": {
+          "class": { "type": "string" },
+          "status": { "enum": ["clean", "not_applicable", "findings"] },
+          "note": { "type": "string" },
+          "findings": { "type": "array", "items": { "type": "string", "pattern": "^F-[0-9]{3}$" } }
+        }
+      }
+    },
+
+    "pattern_conformance": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pattern", "present"],
+        "properties": {
+          "pattern": { "type": "string" },
+          "reference": { "type": "string", "description": "reference file the pattern comes from" },
+          "present": { "enum": ["yes", "no", "partial"] },
+          "note": { "type": "string" }
+        }
+      }
+    },
+
+    "test_coverage_gaps": { "type": "array", "items": { "type": "string" } },
+
+    "open_questions": {
+      "type": "array",
+      "description": "Things the model couldn't determine from code alone, and low-confidence concerns. Residual risk lives here — never hidden.",
+      "items": { "type": "string" }
+    }
+  },
+
+  "$defs": {
+    "severity": { "enum": ["critical", "high", "medium", "low", "info"] }
+  }
+}

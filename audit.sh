@@ -139,6 +139,31 @@ if [[ -d "$TARGET/tests" ]]; then
   while IFS= read -r f; do TARGET_FILES+=("$f"); done < <(find "$TARGET/tests" -name "*.rs" -type f 2>/dev/null | sort)
 fi
 
+# ---- reproducibility metadata -----------------------------------------------
+# Stamped into every report (md header + report.json) so a run is reproducible,
+# and so an L3 on-chain attestation has a stable code anchor to bind to.
+KIT_VERSION="$(cat "$KIT_DIR/VERSION" 2>/dev/null || echo 0.0.0)"
+if git -C "$KIT_DIR" rev-parse --short HEAD >/dev/null 2>&1; then
+  KIT_VERSION="${KIT_VERSION}+g$(git -C "$KIT_DIR" rev-parse --short HEAD)"
+fi
+CHECKLIST_VERSION="$(sed -n 's/.*checklist-version:[[:space:]]*\([0-9.]*\).*/\1/p' \
+  "$KIT_DIR/prompts/checklist.md" 2>/dev/null | head -1)" || CHECKLIST_VERSION=""
+CHECKLIST_VERSION="${CHECKLIST_VERSION:-unknown}"
+# sha256 of the concatenated analyzed source — the anchor an attestation binds to.
+if command -v sha256sum >/dev/null 2>&1; then
+  SOURCE_HASH="$(cat "${TARGET_FILES[@]}" 2>/dev/null | sha256sum | cut -d' ' -f1)" || SOURCE_HASH=""
+elif command -v shasum >/dev/null 2>&1; then
+  SOURCE_HASH="$(cat "${TARGET_FILES[@]}" 2>/dev/null | shasum -a 256 | cut -d' ' -f1)" || SOURCE_HASH=""
+else
+  SOURCE_HASH=""
+fi
+case "$MODEL" in
+  deepseek) MODEL_DESC="deepseek/deepseek-chat" ;;
+  both)     MODEL_DESC="deepseek/deepseek-chat + anthropic/claude-sonnet-4-6" ;;
+  *)        MODEL_DESC="anthropic/claude-sonnet-4-6" ;;
+esac
+REPORT_JSON="${REPORT%.md}.json"
+
 # ---- collect read-only reference files --------------------------------------
 declare -a READ_FILES=()
 READ_FILES+=("$KIT_DIR/prompts/checklist.md")
@@ -276,6 +301,24 @@ else
   rm -f "$REPORT.raw" 2>/dev/null
 fi
 
+# ---- structured output: split report.json out of the markdown ----------------
+# Best-effort: if python3 is missing or the model emitted no JSON block, the
+# markdown report is still produced and we simply skip report.json.
+if command -v python3 >/dev/null 2>&1; then
+  python3 "$KIT_DIR/bin/extract-report.py" \
+    --raw "$REPORT" --out-json "$REPORT_JSON" --out-md "$REPORT" \
+    --kit-version "$KIT_VERSION" --model "$MODEL_DESC" \
+    --checklist-version "$CHECKLIST_VERSION" --reference-set "${#READ_FILES[@]} files" \
+    --repo "$REPO" --package "$PKG" --source-hash "$SOURCE_HASH" \
+    --files "${#TARGET_FILES[@]}" --generated-at "$DATE" \
+    --schema "$KIT_DIR/schema/audit-report.schema.json" \
+    || echo "warn: report.json not produced (see above)" >&2
+else
+  echo "warn: python3 not found — skipping report.json (markdown still written)" >&2
+fi
+
 echo ""
-echo "==> done. report: $REPORT"
-echo "    (raw stderr: $REPORT.stderr)"
+echo "==> done."
+echo "    markdown: $REPORT"
+if [[ -f "$REPORT_JSON" ]]; then echo "    json:     $REPORT_JSON"; fi
+echo "    stderr:   $REPORT.stderr"

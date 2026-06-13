@@ -1,0 +1,247 @@
+{
+  "schema_version": "1.0",
+  "kit": {
+    "version": "0.1.0",
+    "model": "anthropic/claude-sonnet-4-6",
+    "checklist_version": "1.0",
+    "generated_at": "2026-06-13",
+    "reference_set": "6 files"
+  },
+  "target": {
+    "repo": "scrypto-audit-kit",
+    "package": "vulnerable-vault",
+    "source_hash": "67bd50984ac3ac5d01f2776aeedfbeac010790fdf0eb9ab6ae8ea3d7526fa3ab",
+    "files_analyzed": 3
+  },
+  "summary": {
+    "overall_risk": "critical",
+    "one_liner": "Toy yield vault with two unprivileged fund-drain paths (public emergency drain and public oracle), deposit math that panics on the first deposit, and a pause that does not cover withdrawals — illustrative fixture, do not deploy.",
+    "asset_inventory": [
+      "XRD vault: self.vault (src/lib.rs:37, initialised src/lib.rs:60)",
+      "share token: minted on deposit (src/lib.rs:38, src/lib.rs:90)",
+      "admin badge: 1 minted at instantiate (src/lib.rs:48-50)"
+    ],
+    "trust_boundaries": [
+      "role `admin`: set_fee_bps/pause/unpause, updatable_by itself (src/lib.rs:20-34)",
+      "PUBLIC: deposit, withdraw, set_oracle_price, emergency_drain (src/lib.rs:26-30)"
+    ],
+    "external_dependencies": [
+      "none — the oracle is an internal struct field, not an external component (src/lib.rs:40)"
+    ]
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "critical",
+      "class": "Auth bypass",
+      "location": "src/lib.rs:119",
+      "title": "emergency_drain is public and unbounded",
+      "what": "emergency_drain is declared PUBLIC (src/lib.rs:30) and calls self.vault.take_all() (src/lib.rs:120), so any caller can empty the vault in one transaction.",
+      "why": "Total, immediate loss of all deposited XRD, by anyone.",
+      "suggested_direction": "Gate behind admin or a dedicated owner role and bound it with a per-call cap and epoch cooldown rather than draining everything at once.",
+      "confidence": "high",
+      "status": "open"
+    },
+    {
+      "id": "F-002",
+      "severity": "critical",
+      "class": "Oracle / price dependence",
+      "location": "src/lib.rs:111",
+      "title": "set_oracle_price is public, single-source, and unchecked",
+      "what": "Anyone can call set_oracle_price (src/lib.rs:29) to set any price with no staleness or sanity bound, then deposit/withdraw against it in the same transaction.",
+      "why": "An attacker sets a favourable price, mints or redeems shares, and extracts value — a second drain path independent of F-001.",
+      "suggested_direction": "Make price updates privileged, source from a real multi-source oracle, and add staleness and deviation bounds before a price is usable.",
+      "confidence": "high",
+      "status": "open"
+    },
+    {
+      "id": "F-003",
+      "severity": "high",
+      "class": "Integer / decimal arithmetic",
+      "location": "src/lib.rs:87",
+      "title": "deposit share math divides by zero and can overflow",
+      "what": "shares = amount * price / total_value * total_shares uses raw operators; on the first deposit total_value is 0 (src/lib.rs:86) so the division panics, and the chained multiply can overflow Decimal.",
+      "why": "The first deposit always reverts (the vault cannot be bootstrapped), and the formula is wrong even when it does not panic.",
+      "suggested_direction": "Special-case the first deposit, use checked_mul/checked_div, and define an explicit share formula with documented vault-favouring rounding.",
+      "confidence": "high",
+      "status": "open"
+    },
+    {
+      "id": "F-004",
+      "severity": "high",
+      "class": "State machine",
+      "location": "src/lib.rs:94",
+      "title": "withdraw ignores the pause flag",
+      "what": "withdraw never checks self.paused (src/lib.rs:95-101), so withdrawals proceed while the vault is paused.",
+      "why": "If pause does not cover exits it cannot contain an incident, and it leaves F-002's price-manipulation drain unstoppable.",
+      "suggested_direction": "Assert !self.paused at the top of withdraw and any other value-moving method so the circuit breaker covers exits.",
+      "confidence": "high",
+      "status": "open"
+    },
+    {
+      "id": "F-005",
+      "severity": "medium",
+      "class": "Time / epoch checks",
+      "location": "src/lib.rs:132",
+      "title": "unpause epoch check is off by one",
+      "what": "The assert requires current_epoch > unlock_epoch (src/lib.rs:132) — one epoch — but the message and intent promise two full epochs.",
+      "why": "The minimum-pause window is half what is documented, weakening the delay the brake is meant to provide.",
+      "suggested_direction": "Compare against unlock_epoch + 2 and add an at-boundary test so the enforced delay matches intent.",
+      "confidence": "high",
+      "status": "open"
+    },
+    {
+      "id": "F-006",
+      "severity": "medium",
+      "class": "Upgrade safety",
+      "location": "src/lib.rs:23",
+      "title": "admin can rotate itself and there is no owner",
+      "what": "admin => updatable_by: [admin] (src/lib.rs:23) lets the admin role rewrite its own rule, and the component globalizes with OwnerRole::None (src/lib.rs:72).",
+      "why": "A compromised or fat-fingered admin is unrecoverable; there is no owner to rotate or freeze it.",
+      "suggested_direction": "Introduce an owner role that governs admin, and make admin updatable_by the owner only.",
+      "confidence": "high",
+      "status": "open"
+    },
+    {
+      "id": "F-007",
+      "severity": "medium",
+      "class": "Integer / decimal arithmetic",
+      "location": "src/lib.rs:106",
+      "title": "set_fee_bps has no upper bound",
+      "what": "set_fee_bps stores bps directly (src/lib.rs:106) with no range check, so the fee can be set above 100%.",
+      "why": "A bad or malicious fee can make the vault unusable or silently expropriate depositors.",
+      "suggested_direction": "Assert an explicit ceiling (e.g. bps <= dec!(1000)) and reject out-of-range values.",
+      "confidence": "high",
+      "status": "open"
+    },
+    {
+      "id": "F-008",
+      "severity": "low",
+      "class": "Event emission",
+      "location": "src/lib.rs:82",
+      "title": "no events on state-changing methods",
+      "what": "deposit, withdraw, set_oracle_price, and emergency_drain mutate state but emit no events (src/lib.rs:82-121).",
+      "why": "Off-chain indexers and monitors cannot observe deposits, redemptions, price changes, or drains, which also hampers incident detection for F-001/F-002.",
+      "suggested_direction": "Define and emit an event for each state change, including amounts and the resource address.",
+      "confidence": "high",
+      "status": "open"
+    }
+  ],
+  "checklist_coverage": [
+    {
+      "class": "Auth bypass",
+      "status": "findings",
+      "findings": [
+        "F-001"
+      ]
+    },
+    {
+      "class": "Reentrancy",
+      "status": "not_applicable",
+      "note": "no external component calls"
+    },
+    {
+      "class": "Integer / decimal arithmetic",
+      "status": "findings",
+      "findings": [
+        "F-003",
+        "F-007"
+      ]
+    },
+    {
+      "class": "Resource handling",
+      "status": "clean",
+      "note": "every bucket is deposited, burned, or returned"
+    },
+    {
+      "class": "Time / epoch checks",
+      "status": "findings",
+      "findings": [
+        "F-005"
+      ]
+    },
+    {
+      "class": "State machine",
+      "status": "findings",
+      "findings": [
+        "F-004"
+      ]
+    },
+    {
+      "class": "External calls / composability",
+      "status": "not_applicable",
+      "note": "no extern_blueprint!, Global<X> calls, or CALL_METHOD"
+    },
+    {
+      "class": "Upgrade safety",
+      "status": "findings",
+      "findings": [
+        "F-006"
+      ]
+    },
+    {
+      "class": "Oracle / price dependence",
+      "status": "findings",
+      "findings": [
+        "F-002"
+      ]
+    },
+    {
+      "class": "Slippage / MEV",
+      "status": "findings",
+      "findings": [
+        "F-002"
+      ],
+      "note": "deposit/withdraw take no caller min_out against the mutable price"
+    },
+    {
+      "class": "Approvals / allowances",
+      "status": "not_applicable",
+      "note": "no long-lived proofs or access-rule grants handed out"
+    }
+  ],
+  "pattern_conformance": [
+    {
+      "pattern": "Owner/admin role separation",
+      "reference": "strategy-vault-threat-model.md",
+      "present": "no",
+      "note": "only a self-rotating admin with OwnerRole::None (src/lib.rs:23, src/lib.rs:72)"
+    },
+    {
+      "pattern": "Per-call cap + cooldown on emergency withdraw",
+      "reference": "strategy-vault-threat-model.md",
+      "present": "no",
+      "note": "emergency_drain takes the whole vault in one call (src/lib.rs:120)"
+    },
+    {
+      "pattern": "Multi-source, staleness-checked oracle",
+      "reference": "strategy-vault-threat-model.md",
+      "present": "no",
+      "note": "single mutable price field, no freshness or deviation check (src/lib.rs:40, src/lib.rs:111)"
+    },
+    {
+      "pattern": "Rounding in the vault's favour",
+      "reference": "caviarnine-hyperstake-patterns.md",
+      "present": "no",
+      "note": "raw operators with implicit rounding (src/lib.rs:87)"
+    },
+    {
+      "pattern": "Circuit breaker that covers exits",
+      "reference": "ignition-patterns.md",
+      "present": "partial",
+      "note": "paused flag exists but withdraw ignores it (src/lib.rs:95)"
+    }
+  ],
+  "test_coverage_gaps": [
+    "withdraw has zero tests — tests/vault.rs exercises only deposit (tests/vault.rs:13)",
+    "no auth-violation test for set_fee_bps/pause/unpause (negative path untested)",
+    "no 'withdraw while paused' test (would catch F-004)",
+    "set_oracle_price and emergency_drain have no tests at all",
+    "unpause epoch boundary (F-005) is untested"
+  ],
+  "open_questions": [
+    "Is set_oracle_price public by intent (e.g. a permissionless keeper)? It still needs staleness and sanity bounds before use (src/lib.rs:111).",
+    "Should deposit/withdraw accept a caller min_shares_out / min_amount_out to resist sandwiching given the mutable price (src/lib.rs:82)?",
+    "Is a governance/owner layer above admin intended? OwnerRole::None leaves no recovery path if the admin badge is lost or compromised (src/lib.rs:72)."
+  ]
+}

@@ -1,3 +1,4 @@
+<!-- checklist-version: 1.0 -->
 # Scrypto Vulnerability Checklist
 
 Eleven classes of issues to walk through for every audit. Each class lists concrete questions; if the answer to any question is "no", that's a finding.
