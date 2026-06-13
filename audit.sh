@@ -33,9 +33,15 @@ set -euo pipefail
 # The key is never echoed.
 if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
   if [[ -n "${AIDER_ENV_FILE:-}" && -f "$AIDER_ENV_FILE" ]]; then
-    set -a; . "$AIDER_ENV_FILE"; set +a
+    set -a
+    # shellcheck source=/dev/null
+    . "$AIDER_ENV_FILE"
+    set +a
   elif [[ -f "$(dirname "$0")/.env" ]]; then
-    set -a; . "$(dirname "$0")/.env"; set +a
+    set -a
+    # shellcheck source=/dev/null
+    . "$(dirname "$0")/.env"
+    set +a
   fi
 fi
 if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
@@ -235,7 +241,7 @@ PROMPT
     DEEPSEEK_FINDINGS=$(grep -cE '^\*\*[Ff]-[0-9]|^### |^#### ' "$DEEPSEEK_REPORT" 2>/dev/null || echo 0)
     CLAUDE_FINDINGS=$(grep -cE '^\*\*[Ff]-[0-9]|^### |^#### ' "$CLAUDE_REPORT" 2>/dev/null || echo 0)
     echo "- **DeepSeek** (pass 1 — broad): ~${DEEPSEEK_FINDINGS} potential findings"
-    echo "- **Claude** (pass 2 — deep): detailed findings below"
+    echo "- **Claude** (pass 2 — deep): ~${CLAUDE_FINDINGS} findings, detailed below"
     echo "- **Confidence**: issues flagged by both models are HIGH confidence"
     echo ""
     echo "---"

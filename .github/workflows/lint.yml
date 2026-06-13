@@ -28,16 +28,14 @@ jobs:
           node-version: '20'
       - run: npm install -g markdownlint-cli@0.39.0
       - name: Lint markdown
-        # Permissive ruleset — references contain code samples that don't follow strict markdown rules
-        run: |
-          markdownlint \
-            --disable MD013 MD024 MD033 MD036 MD041 \
-            -- README.md CONTRIBUTING.md CODE_OF_CONDUCT.md \
-               prompts/ references/
+        # Ruleset lives in .markdownlint.json (auto-discovered). References bend
+        # strict markdown rules for code samples — see that file for what's relaxed.
+        run: markdownlint README.md CONTRIBUTING.md CODE_OF_CONDUCT.md prompts/ references/
 
   links:
     name: check links in README
     runs-on: ubuntu-latest
+    continue-on-error: true  # external link checking is flaky (rate limits, transient 404s) — never block CI on it
     steps:
       - uses: actions/checkout@v4
       - name: Lychee link check
