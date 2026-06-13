@@ -24,3 +24,7 @@ audit-reports/*
 
 # Rust artifacts — only present if someone runs cargo here for some reason
 target/
+
+# Python artifacts
+__pycache__/
+*.pyc
