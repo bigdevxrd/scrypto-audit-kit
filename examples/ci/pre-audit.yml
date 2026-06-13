@@ -1,0 +1,24 @@
+# Copy this into .github/workflows/pre-audit.yml in YOUR Scrypto repo.
+#
+# Setup:
+#   1. Add a repo secret named ANTHROPIC_API_KEY (Settings → Secrets → Actions).
+#   2. Point `package` at your blueprint (the dir with Cargo.toml + src/lib.rs).
+#   3. Add the badge to your README — see docs/ci.md.
+#
+# It runs scrypto-audit-kit on every PR and fails if a High/Critical issue is found.
+name: pre-audit
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  scrypto-pre-audit:
+    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@main
+    with:
+      package: packages/my-blueprint   # ← change to your package path
+      fail-on: high                     # block on high + critical; use `critical` to be lenient
+      # model: claude                   # or deepseek (cheaper) / both (cross-model)
+      # kit-ref: v0.1.0                 # pin the kit to a release for reproducible runs
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

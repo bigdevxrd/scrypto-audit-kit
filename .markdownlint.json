@@ -1,9 +1,11 @@
 {
-  "//": "Permissive ruleset — reference catalogues use pseudo-code fences and dense formatting that bends strict markdown rules. Picked up automatically by both CI and `make lint`.",
+  "//": "Permissive ruleset — reference catalogues use pseudo-code fences and dense formatting, and generated audit reports use a fixed heading/blockquote shape. Both bend strict markdown rules. Picked up automatically by CI and `make lint`.",
   "default": true,
+  "MD001": false,
   "MD013": false,
   "MD024": false,
   "MD026": false,
+  "MD028": false,
   "MD031": false,
   "MD032": false,
   "MD033": false,

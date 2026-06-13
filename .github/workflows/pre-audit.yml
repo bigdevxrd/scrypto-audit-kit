@@ -1,0 +1,69 @@
+# Reusable pre-audit workflow. Call it from your Scrypto repo — see
+# examples/ci/pre-audit.yml for a copy-paste caller and docs/ci.md for the badge.
+name: pre-audit
+
+on:
+  workflow_call:
+    inputs:
+      package:
+        description: "Path to the Scrypto package to audit (dir with Cargo.toml + src/lib.rs)."
+        required: true
+        type: string
+      model:
+        description: "claude | deepseek | both"
+        required: false
+        default: claude
+        type: string
+      fail-on:
+        description: "Highest severity allowed before the build fails: none | low | medium | high | critical."
+        required: false
+        default: high
+        type: string
+      kit-ref:
+        description: "scrypto-audit-kit ref to pin (tag/branch/sha)."
+        required: false
+        default: main
+        type: string
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: true
+
+jobs:
+  pre-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the project under audit
+        uses: actions/checkout@v4
+
+      - name: Check out scrypto-audit-kit
+        uses: actions/checkout@v4
+        with:
+          repository: bigdevxrd/scrypto-audit-kit
+          ref: ${{ inputs.kit-ref }}
+          path: .scrypto-audit-kit
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Add wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install aider
+        run: pipx install aider-chat
+
+      - name: Run pre-audit
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: .scrypto-audit-kit/audit.sh --model "${{ inputs.model }}" "${{ inputs.package }}"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-audit-report
+          path: .scrypto-audit-kit/audit-reports/*
+          if-no-files-found: warn
+
+      - name: Gate on severity
+        run: python3 .scrypto-audit-kit/bin/ci-gate.py --reports .scrypto-audit-kit/audit-reports --fail-on "${{ inputs.fail-on }}"

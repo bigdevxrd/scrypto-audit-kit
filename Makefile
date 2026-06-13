@@ -27,8 +27,9 @@ audit:
 lint:
 	@command -v shellcheck >/dev/null || { echo "shellcheck not installed — brew install shellcheck"; exit 1; }
 	shellcheck audit.sh
+	@if command -v python3 >/dev/null; then python3 -m py_compile bin/*.py && echo "python: ok"; else echo "(python3 not installed — skipping py check)"; fi
 	@if command -v markdownlint >/dev/null; then \
-		markdownlint prompts/ references/ README.md CONTRIBUTING.md; \
+		markdownlint README.md CONTRIBUTING.md CODE_OF_CONDUCT.md VISION.md docs/ prompts/ references/ examples/; \
 	else \
 		echo "(markdownlint not installed — skipping md lint)"; \
 	fi
@@ -38,6 +39,7 @@ check-deps:
 	@command -v bash      >/dev/null && echo "bash:      $$(bash --version | head -1)" || echo "bash:      MISSING"
 	@command -v awk       >/dev/null && echo "awk:       present"                    || echo "awk:       MISSING"
 	@command -v find      >/dev/null && echo "find:      present"                    || echo "find:      MISSING"
+	@command -v python3   >/dev/null && echo "python3:   $$(python3 --version 2>&1)"  || echo "python3:   not found (report.json will be skipped)"
 	@[ -n "$$ANTHROPIC_API_KEY" ] && echo "ANTHROPIC_API_KEY: set" || echo "ANTHROPIC_API_KEY: NOT SET (aider needs it for the default sonnet model)"
 	@[ -n "$$DEEPSEEK_API_KEY" ] && echo "DEEPSEEK_API_KEY:  set" || echo "DEEPSEEK_API_KEY:  not set (only needed for --model deepseek/both)"
 

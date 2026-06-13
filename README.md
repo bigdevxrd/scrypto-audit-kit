@@ -19,7 +19,7 @@ For each scrypto package you point it at, the kit:
 1. Loads the package's source (Cargo.toml + everything under `src/` and `tests/`) into an [aider](https://aider.chat) session.
 2. Loads a vulnerability **checklist** (11 classes — auth, reentrancy, decimal, resource handling, time, state machine, external calls, upgrade, oracle, slippage, allowances) and a catalogue of **reference patterns** (Ignition, CaviarNine HyperStake, subintents, a strategy-vault threat model, general scrypto knowledge) as read-only context.
 3. Asks Claude Sonnet 4.6 to produce a structured findings report — summary, findings (Critical → Info), checklist coverage walk, pattern conformance check, test-coverage gaps, open questions for the human auditor.
-4. Writes the report to `audit-reports/<repo>-<package>-<date>.md`.
+4. Writes a markdown report to `audit-reports/<repo>-<package>-<date>.md` **and** a machine-readable `report.json` ([schema](schema/audit-report.schema.json)) that agents and the CI gate consume.
 
 The kit is **read-only by design**. It produces reports; it does not edit your blueprint. Edits to audit-grade code must go through a separate, human-supervised session.
 
@@ -30,6 +30,7 @@ The kit is **read-only by design**. It produces reports; it does not edit your b
 - [aider](https://aider.chat) (`pip install aider-chat` — version 0.86 or newer)
 - An Anthropic API key (the kit defaults to Claude Sonnet 4.6 — get one at <https://console.anthropic.com>)
 - bash, awk, find (standard on macOS / Linux)
+- `python3` — optional; only needed for the machine-readable `report.json` (the markdown report works without it)
 
 The key can be provided in any of three ways:
 
@@ -105,16 +106,49 @@ The default is Claude Sonnet 4.6. A `--model` flag selects the analysis model:
 context, and tags findings both models agree on as HIGH confidence. Use it when
 you want a second opinion on a high-stakes blueprint.
 
+### Try it on the bundled example
+
+The repo ships a deliberately-vulnerable blueprint so you can see real output without writing any code:
+
+```bash
+./audit.sh --no-compile-check examples/vulnerable-vault
+```
+
+The expected result is committed beside it — [`examples/vulnerable-vault.pre-audit.md`](examples/vulnerable-vault.pre-audit.md) (human) and [`.json`](examples/vulnerable-vault.pre-audit.json) (machine-readable). Every `file:line` in it is exact, because the bugs are planted.
+
+### Machine-readable output
+
+Alongside the markdown, the kit writes `report.json` conforming to [`schema/audit-report.schema.json`](schema/audit-report.schema.json) — stable `F-###` ids, severities, full checklist coverage, and a provenance block (kit version, model, checklist version, and a sha256 of the analyzed source). This is what agents, the CI gate, and (later) on-chain attestation consume; the markdown is a render of it.
+
+### Continuous integration & a badge
+
+Run the pre-audit on every PR and show a status badge — full setup in [docs/ci.md](docs/ci.md). In short, call the reusable workflow:
+
+```yaml
+jobs:
+  scrypto-pre-audit:
+    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@main
+    with:
+      package: packages/my-blueprint
+      fail-on: high
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+It compiles, audits, uploads the report, and fails on High/Critical findings — an honest "pre-audit passing" signal, not a safety guarantee.
+
 ## What's in the kit
 
 ```
 scrypto-audit-kit/
 ├── audit.sh              The harness — wraps aider with the right flags + context.
 ├── Makefile              Convenience targets (audit, lint, check-deps).
+├── VERSION               Kit version, stamped into every report.
+├── VISION.md             The trust-ladder strategy + roadmap.
 ├── .aider.conf.yml       Tuned config: model=Sonnet 4.6, no editor, no commits, prompt cache on.
 ├── .aiderignore          Aider no-fly zones (build artifacts, secrets, prior reports).
 ├── prompts/
-│   ├── audit.md          The system-style prompt that frames the auditor role + report structure.
+│   ├── audit.md          Auditor-role prompt + report structure (incl. the JSON appendix).
 │   └── checklist.md      Eleven vulnerability classes with concrete questions per class.
 ├── references/           Read-only context — production patterns + threat models.
 │   ├── README.md         Curator notes and update procedure.
@@ -123,8 +157,13 @@ scrypto-audit-kit/
 │   ├── subintents-patterns.md
 │   ├── strategy-vault-threat-model.md
 │   └── radix-scrypto-knowledge.md
+├── schema/               JSON Schema for the machine-readable report.
+├── bin/                  extract-report.py (md→json split) + ci-gate.py (severity gate).
+├── docs/                 ci.md — wiring the pre-audit into CI + the badge.
 ├── audit-reports/        Output dir, gitignored.
-└── examples/             Worked examples (sample reports, usage recipes).
+└── examples/
+    ├── vulnerable-vault/ Deliberately-vulnerable fixture + its committed report.
+    └── ci/               Drop-in pre-audit workflow for your repo.
 ```
 
 ## Limitations — read this before relying on the output

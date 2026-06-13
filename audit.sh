@@ -55,15 +55,18 @@ fi
 
 # ---- arg parsing ------------------------------------------------------------
 MODEL="claude"
+SKIP_COMPILE=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
       sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
       echo ""
       echo "Options:"
-      echo "  --model <model>    claude (default), deepseek, or both"
-      echo "                     both runs DeepSeek first (broad), then Claude"
-      echo "                     (deep) and cross-references findings."
+      echo "  --model <model>      claude (default), deepseek, or both"
+      echo "                       both runs DeepSeek first (broad), then Claude"
+      echo "                       (deep) and cross-references findings."
+      echo "  --no-compile-check   skip the cargo wasm pre-flight (use when the"
+      echo "                       toolchain isn't set up, e.g. the bundled example)"
       exit 0
       ;;
     --model)
@@ -72,6 +75,7 @@ while [[ $# -gt 0 ]]; do
         echo "error: --model must be claude, deepseek, or both" >&2; exit 1
       fi
       ;;
+    --no-compile-check) SKIP_COMPILE=1 ;;
     *) break ;;
   esac
   shift
@@ -104,15 +108,25 @@ fi
 # ---- pre-flight: compile check ----------------------------------------------
 # Bail early if the code doesn't compile — no point spending LLM time on
 # broken code. Uses release wasm target to match actual deploy target.
-echo "[pre-flight] cargo check (release wasm)..."
-if ! cargo check --manifest-path "$TARGET/Cargo.toml" \
-       --release --target wasm32-unknown-unknown 2>/dev/null; then
-  echo "error: cargo check failed — fix compile errors before auditing." >&2
-  echo "       Run: cd $TARGET && cargo check --release --target wasm32-unknown-unknown" >&2
-  exit 1
+# Skippable with --no-compile-check (e.g. the bundled example, or a toolchain
+# mismatch) — the analysis itself doesn't need a successful build.
+if [[ "$SKIP_COMPILE" == "1" ]]; then
+  echo "[pre-flight] compile check skipped (--no-compile-check)"
+  echo ""
+elif ! command -v cargo >/dev/null 2>&1; then
+  echo "[pre-flight] cargo not found — skipping compile check" >&2
+  echo ""
+else
+  echo "[pre-flight] cargo check (release wasm)..."
+  if ! cargo check --manifest-path "$TARGET/Cargo.toml" \
+         --release --target wasm32-unknown-unknown 2>/dev/null; then
+    echo "error: cargo check failed — fix compile errors before auditing." >&2
+    echo "       (or re-run with --no-compile-check to audit anyway)" >&2
+    exit 1
+  fi
+  echo "[pre-flight] compile OK"
+  echo ""
 fi
-echo "[pre-flight] compile OK"
-echo ""
 
 # ---- derive a report name ---------------------------------------------------
 PKG="$(basename "$TARGET")"
