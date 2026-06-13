@@ -1,0 +1,47 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shellcheck:
+    name: shellcheck audit.sh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: '.'
+          ignore_paths: 'audit-reports references'
+
+  markdown:
+    name: markdownlint prompts + references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install -g markdownlint-cli@0.39.0
+      - name: Lint markdown
+        # Permissive ruleset — references contain code samples that don't follow strict markdown rules
+        run: |
+          markdownlint \
+            --disable MD013 MD024 MD033 MD036 MD041 \
+            -- README.md CONTRIBUTING.md CODE_OF_CONDUCT.md \
+               prompts/ references/
+
+  links:
+    name: check links in README
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lychee link check
+        uses: lycheeverse/lychee-action@v2.0.0
+        with:
+          args: --no-progress --max-concurrency 4 README.md CONTRIBUTING.md references/README.md
+          fail: false  # don't fail CI on transient link failures; surface as a check

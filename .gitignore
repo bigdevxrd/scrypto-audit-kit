@@ -1,0 +1,26 @@
+# Audit reports — generated outputs, not source of truth
+audit-reports/*
+!audit-reports/.gitkeep
+
+# Aider session artifacts
+.aider*
+!.aiderignore
+!.aider.conf.yml
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Secrets — should never be in this repo, but defense in depth
+.env
+.env.*
+# ...but the template IS tracked, so users know what to set:
+!.env.example
+*.key
+*.pem
+
+# Rust artifacts — only present if someone runs cargo here for some reason
+target/

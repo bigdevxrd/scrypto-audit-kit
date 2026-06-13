@@ -1,0 +1,43 @@
+# scrypto-audit-kit aider config
+#
+# This config configures aider as a *read-only auditor*. It produces a markdown
+# findings report; it never edits the blueprint under audit. Edits to audit-grade
+# scrypto code must go through a separate, human-supervised session.
+#
+# See: https://aider.chat/docs/config/options.html
+
+# === Model selection =================================================
+# Default to Claude Sonnet 4.6 for the pattern-recognition depth that
+# audit-grade work needs. DeepSeek is available as a cheaper opt-in for
+# broad scans via `./audit.sh --model deepseek` (or `--model both` to
+# cross-reference the two). audit.sh passes --model explicitly, so this
+# value is the fallback for running aider directly.
+model: anthropic/claude-sonnet-4-6
+weak-model: anthropic/claude-sonnet-4-6  # unused — auto-commits are off
+
+architect: false                     # single-model run; no editor handoff
+
+# === Cost / cache ====================================================
+cache-prompts: true                  # references + checklist cache across runs
+map-tokens: 0                        # no auto repo-map; we provide context explicitly
+
+# === Never commits ===================================================
+# This tool produces reports, not code changes. It must never commit anything.
+auto-commits: false
+dirty-commits: false
+attribute-author: false
+attribute-committer: false
+
+# === Read-only stance ================================================
+# Aider must not propose shell commands or pretend to run them.
+suggest-shell-commands: false
+show-model-warnings: false
+
+# === Non-interactive defaults ========================================
+# Used when invoked from audit.sh in batch mode.
+yes-always: true                     # don't prompt for file adds — script declares them
+stream: false                        # collect full response for tee'ing to report file
+
+# === Output =========================================================
+# The default chat mode is fine; the architect prompt instructs the model
+# to emit a structured markdown report.

@@ -1,0 +1,24 @@
+# scrypto-audit-kit no-fly zones
+# Files matched here are invisible to aider during audit runs.
+# Format: gitignore syntax.
+
+# === Audit outputs — never read back into context ===
+audit-reports/
+
+# === Runtime / build artifacts ===
+node_modules/
+target/
+dist/
+build/
+*.wasm
+*.rpd
+
+# === Secrets — defense in depth ===
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# === Aider's own state ===
+.aider*
