@@ -1,6 +1,6 @@
 # Vision — a trust ladder for Scrypto
 
-> **TL;DR** — Audits are expensive and scarce, so most Scrypto code ships with *nothing* between "it compiles" and "we hope it's fine." `scrypto-audit-kit` aims to be the missing rungs in between: a free, transparent, **agentic** pre-audit that any builder (or their agent) can run in minutes, that produces a *reproducible, verifiable* artifact, and that escalates cleanly into a full human audit (Hacken, Certik, …) rather than pretending to replace one.
+> **TL;DR** — Audits are expensive and scarce, so most Scrypto code ships with *nothing* between "it compiles" and "we hope it's fine." `scrypto-audit-kit` aims to be the missing rungs in between: a free, transparent, **agentic** pre-audit that any builder (or their agent) can run in minutes, that produces a versioned, partly-reproducible artifact (the static tier is deterministic; the LLM layer is advisory), and that escalates cleanly into a full human audit (Hacken, Certik, …) rather than pretending to replace one.
 
 This document is the north star. It's deliberately ambitious. Nothing here is a promise of safety — see [Honest scope](#honest-scope).
 
@@ -28,7 +28,7 @@ Trust in code isn't binary; it's a ladder you climb as far as your risk demands.
 |------|------|------|-----|
 | **L0** | Compile & lint (`cargo check`, clippy) | free · seconds | everyone |
 | **L1** | **Agentic pre-audit** — point an agent at your repo; audit → fix → re-verify | free · OSS | this kit |
-| **L2** | **Reproducible attested run** — pinned model + checklist, runs in CI → live badge | free–$ · minutes | this kit |
+| **L2** | **Attested CI run** — pinned method + deterministic static tier, runs in CI → live badge | free–$ · minutes | this kit |
 | **L3** | **On-chain attestation** — soulbound proof on Radix binds code-hash ↔ report | tamper-evident | this kit |
 | **L4** | **Human audit** — Hacken, Certik, … the kit's report is the *input* | $$$ · weeks | partners |
 
@@ -40,7 +40,7 @@ An LLM pre-audit is worthless *the moment it overclaims*. Our entire credibility
 
 1. **Never claim "safe" or "audited."** We claim exactly what ran: "passed kit vX, checklist vY, N classes covered, 0 critical/high, M residual open questions." A coverage statement, not a guarantee.
 2. **Transparent by construction.** The checklist, the reference patterns, and the prompt are all open. Anyone can see *exactly* what is and isn't checked. No black box.
-3. **Reproducible.** Every report records the kit version, model, checklist version, and reference-set hash. Pin those and you get the same analysis. Determinism is what trust is made of.
+3. **Reproducible where it can be.** Every report records the kit version, model, checklist version, and reference-set hash, so the *method* is pinned and the deterministic static-tier findings reproduce exactly. The LLM pass is **not** byte-reproducible (production APIs drift, even at temperature 0) — we say so, and anchor verification on the source hash + static findings rather than pretend the whole report regenerates.
 4. **Honest about misses.** Residual risk and low-confidence concerns are surfaced as open questions, not buried. We publish our own false-positive / false-negative track record.
 5. **A funnel, not a replacement.** We are structurally *aligned* with human auditors — we send them cleaner code — not competing with them. The ladder ends at L4 on purpose.
 6. **Read-only core.** The auditor never edits the code under review. Fixes happen in a separate, human-supervised session. Analysis and mutation stay apart.

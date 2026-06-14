@@ -115,7 +115,7 @@ A static pass runs on every audit, and you can run it *alone* with **no API key,
 ./audit.sh --static-only <path>     # free, instant, deterministic
 ```
 
-It applies a curated set of high-precision Scrypto rules (comment/string-aware, so it never matches inside a comment or a string literal) and writes the same `report.json`. Suppress a finding with a `// sak:allow <rule-id>` comment; add `--no-static` to a full run to skip the pass. See [docs/static-analysis.md](docs/static-analysis.md) for the rule list and how to add one.
+It applies a curated set of high-precision Scrypto rules — comment/string-aware, so code rules don't match inside comments or string literals — and writes the same `report.json`. Suppress a finding with a `// sak:allow <rule-id>` comment; add `--no-static` to a full run to skip the pass. See [docs/static-analysis.md](docs/static-analysis.md) for the rule list and how to add one.
 
 ### Try it on the bundled example
 
@@ -162,7 +162,7 @@ Tools: `static_scan` (free), `audit_package`, `propose_tests`, `attestation_payl
 ### Generate tests, attest on-chain
 
 - **Property tests.** `propose_tests` (or `python3 bin/gen_tests.py <pkg>`) emits compilable `#[ignore]`d `scrypto-test` scaffolds for the coverage gaps — auth negative-paths, happy paths, a value invariant — so closing them is fill-in-the-blank.
-- **On-chain attestation (L3).** `attestation_payload` (or `python3 bin/attest.py <report.json>`) turns a report into a Radix transaction manifest that records a reproducible attestation on-ledger via the [attestation/](attestation/) registry blueprint — a coverage claim bound to your exact source hash, verifiable by re-running the kit. Not a safety guarantee.
+- **On-chain attestation (L3).** `attestation_payload` (or `python3 bin/attest.py <report.json>`) turns a report into a Radix transaction manifest that records an attestation on-ledger via the [attestation/](attestation/) registry blueprint — bound to your exact source hash (the deterministic anchor). A coverage record, not a safety guarantee, and for the LLM tier not byte-reproducible (see [attestation/README.md](attestation/README.md)).
 
 ## What's in the kit
 

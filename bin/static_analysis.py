@@ -8,7 +8,8 @@ with the LLM pass into one report.
 
 Design for precision: the source is first run through a comment/string-aware stripper that
 blanks the *contents* of comments and string/char literals while preserving every newline,
-so rules never match inside a comment or a string. Suppress a single finding with a
+so code rules don't match inside a comment or a string (hardcoded-address reads string literals and
+todo-comment reads comments, by design). Suppress a single finding with a
 `// sak:allow <rule-id>` comment on the offending line or the line above.
 
 Stdlib only. Importable (analyze_package) and a CLI. Unit-tested in tests/test_static_analysis.py.

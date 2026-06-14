@@ -18,7 +18,7 @@ If the `scrypto-audit-kit` MCP server is connected, prefer its tools:
 - `show_finding_source(report_path, finding_id, package_path)` — show the cited code. **Always verify a citation before acting on it** — the model can hallucinate line numbers.
 - `reaudit_diff(package_path, baseline_report_path)` — after fixes, see what `fixed` / `still_open` / `new`.
 - `gate(report_path, fail_on)` — does it pass at a severity threshold?
-- `get_checklist()` — the 11 vulnerability classes the kit checks.
+- `get_checklist()` — the 11 vulnerability classes the kit considers (a few are mechanically enforced by the static tier; the rest are walked by the LLM, not deterministically verified).
 
 If the MCP server isn't available, run the CLI: `./audit.sh <package>` (add
 `--no-compile-check` when the wasm toolchain isn't set up), then read the

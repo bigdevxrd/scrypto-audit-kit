@@ -5,14 +5,20 @@ audits Scrypto; the proof lives *on* Scrypto. This is rung **L3** of the [trust 
 
 ## What an attestation asserts
 
-A reproducible, factual claim — **not** a safety guarantee:
+A factual, on-ledger record — **not** a safety guarantee, and (for the LLM tier) **not**
+byte-reproducible:
 
 > scrypto-audit-kit `<kit_version>` (checklist `<checklist_version>`) produced report
 > `<report_hash>` over source `<source_hash>`, at level `<level>`, with these severity
 > counts, at epoch `E`.
 
-Anyone can **verify** it by re-running the kit on the same source and checking that the
-report hash matches. Trust comes from that reproducibility, not from who minted it.
+What is actually verifiable depends on the tier:
+
+- **`source_hash`** (sha256 of the analysed source) is the stable anchor — anyone can recompute it from the code and confirm the attestation is *about* that exact source.
+- **L1-static** findings are **deterministic**: re-run `./audit.sh --static-only` on the same source and you get the same findings.
+- **L2-hybrid** adds a non-deterministic LLM pass, so `report.json` (and thus `report_hash`) will **not** be identical on re-run. For L2, `report_hash` is a tamper-evidence fingerprint of *one archived report*, not a value a third party can regenerate.
+
+So an attestation proves *which source was analysed and what one run reported* — it does **not**, by itself, prove the kit was run or that the counts are honest (see self-attestation below). The strongest signal is `issuer_verified`.
 
 ## Design
 

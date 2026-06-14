@@ -1,13 +1,14 @@
 //! Scrypto Pre-Audit Attestation Registry — the L3 trust primitive for scrypto-audit-kit.
 //!
-//! Records a reproducible, on-ledger claim: "scrypto-audit-kit <kit_version> (checklist
-//! <checklist_version>) produced report <report_hash> over source <source_hash>, at <level>,
-//! with these severity counts, at epoch E." It is **not** a safety guarantee — it is a coverage
-//! claim anyone can verify by re-running the kit on the same source and comparing report hashes.
+//! Records an on-ledger claim: "scrypto-audit-kit <kit_version> (checklist <checklist_version>)
+//! produced report <report_hash> over source <source_hash>, at <level>, with these severity counts,
+//! at epoch E." It is NOT a safety guarantee. The `source_hash` is the stable anchor; static-tier
+//! findings are reproducible from it, but the L2 LLM pass is non-deterministic, so `report_hash` is
+//! a tamper-evidence fingerprint of one archived report, not a re-derivable value.
 //!
-//! Attestation is permissionless (self-attestation); trust comes from reproducibility, not from
-//! who minted. A trusted `issuer` (the OWNER) can additionally endorse an attestation. The minted
-//! NFT is soulbound (non-transferable once held).
+//! Attestation is permissionless: a self-attestation proves only that someone wrote these bytes
+//! on-ledger, NOT that the kit was run. The meaningful trust signal is `issuer_verified`, set by a
+//! trusted `issuer` (the OWNER). The minted NFT is soulbound (non-transferable once held).
 //!
 //! ⚠️ REFERENCE IMPLEMENTATION. It type-checks (`cargo check`) and is compile-checked in CI, but it
 //! has not been deployed or human-audited. Build, test, pre-audit (run the kit on it), and human-audit

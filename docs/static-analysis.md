@@ -15,9 +15,11 @@ agents as the `static_scan` MCP tool. Findings use `S-###` ids and `source: "sta
 ## Precision by design
 
 Rules run over the source **after** a comment/string-aware stripper blanks the *contents* of
-comments and string/char literals (preserving line numbers). So a rule never matches inside a
-`// comment` or a `"string literal"` — only real code. Rules are deliberately **high-precision**
-(few false positives); semantic judgement is left to the LLM pass.
+comments and string/char literals (it handles nested block comments and string line-continuations,
+preserving line numbers). So **code** rules don't match inside a `// comment` or a `"string
+literal"`. Two rules intentionally read the other view — `hardcoded-address` checks string literals,
+`todo-comment` checks comments. Rules are deliberately **high-precision** (they prefer to miss over
+to over-flag); recall is the LLM pass's job.
 
 ## Rules
 

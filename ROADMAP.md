@@ -34,7 +34,7 @@ Anything unchecked is fair game — open an issue to claim it.
 
 ## Phase 4 — Verifiable & connected 🚧 (v0.4)
 
-- [x] On-chain attestation blueprint (soulbound, source-hash ↔ report-hash) + the `attest.py` manifest bridge ([attestation/](attestation/))
+- [x] On-chain attestation blueprint — type-checks + CI-compiled, **not yet deployed/audited** (soulbound; source-hash anchor) + the `attest.py` manifest bridge ([attestation/](attestation/))
 - [ ] Build/deploy the registry to Stokenet + a public dashboard of attested blueprints
 - [ ] Auditor partnership (pre-audit funnel) + Radix grant
 
