@@ -18,9 +18,13 @@ L1 of the [trust ladder](../VISION.md).
 | `gate(report_path, fail_on?)` | Pass/fail at a severity threshold. |
 | `get_checklist()` | The 11 vulnerability classes. |
 
-The cheap tools (`get_findings`, `gate`, `get_checklist`, `show_finding_source`) need
-no API key. `audit_package` / `reaudit_diff` run the model and need `ANTHROPIC_API_KEY`
-in the server's environment.
+The cheap tools (`static_scan`, `propose_tests`, `attestation_payload`, `get_findings`, `gate`,
+`get_checklist`, `show_finding_source`) need no API key. `audit_package` / `reaudit_diff` run
+the model and need `ANTHROPIC_API_KEY` in the server's environment.
+
+**Full reference:** per-tool input/output and the formal, machine-readable contracts are in
+[mcp-tools.md](mcp-tools.md) ([schema/mcp-tools.schema.json](../schema/mcp-tools.schema.json)).
+The same nine functions are importable in-process — see [sdk.md](sdk.md#the-9-tools-in-process).
 
 ## Install
 
@@ -65,3 +69,7 @@ to get it there too. Then just ask Claude to "pre-audit my blueprint", or run
 3. Apply a minimal fix (with the user's review).
 4. `reaudit_diff("packages/my-vault", report_path)` → confirm it moved to `fixed` and nothing `new` appeared.
 5. Repeat until `gate(report_path, "high")` passes — a pre-audit pass, not a human-audit substitute.
+
+A runnable version of this loop (against the bundled fixture, no key needed for the
+deterministic half) is
+[`examples/agents/audit_fix_verify.py`](../examples/agents/audit_fix_verify.py).
