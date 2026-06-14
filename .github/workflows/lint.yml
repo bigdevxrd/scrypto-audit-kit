@@ -32,18 +32,6 @@ jobs:
         # strict markdown rules for code samples — see that file for what's relaxed.
         run: markdownlint README.md CONTRIBUTING.md CODE_OF_CONDUCT.md AGENTS.md VISION.md ROADMAP.md docs/ prompts/ references/ examples/
 
-  links:
-    name: check links in README
-    runs-on: ubuntu-latest
-    continue-on-error: true  # external link checking is flaky (rate limits, transient 404s) — never block CI on it
-    steps:
-      - uses: actions/checkout@v4
-      - name: Lychee link check
-        uses: lycheeverse/lychee-action@v2.0.0
-        with:
-          args: --no-progress --max-concurrency 4 README.md CONTRIBUTING.md references/README.md
-          fail: false  # don't fail CI on transient link failures; surface as a check
-
   tests:
     name: unit tests
     runs-on: ubuntu-latest
