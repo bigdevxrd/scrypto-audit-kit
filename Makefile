@@ -29,7 +29,7 @@ lint:
 	shellcheck audit.sh
 	@if command -v python3 >/dev/null; then python3 -m py_compile bin/*.py && echo "python: ok"; else echo "(python3 not installed — skipping py check)"; fi
 	@if command -v markdownlint >/dev/null; then \
-		markdownlint README.md CHANGELOG.md CONTRIBUTING.md CODE_OF_CONDUCT.md AGENTS.md VISION.md ROADMAP.md docs/ prompts/ references/ examples/ attestation/; \
+		markdownlint README.md CHANGELOG.md RELEASING.md CONTRIBUTING.md CODE_OF_CONDUCT.md AGENTS.md VISION.md ROADMAP.md docs/ prompts/ references/ examples/ attestation/; \
 	else \
 		echo "(markdownlint not installed — skipping md lint)"; \
 	fi

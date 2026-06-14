@@ -30,7 +30,7 @@ jobs:
       - name: Lint markdown
         # Ruleset lives in .markdownlint.json (auto-discovered). References bend
         # strict markdown rules for code samples — see that file for what's relaxed.
-        run: markdownlint README.md CHANGELOG.md CONTRIBUTING.md CODE_OF_CONDUCT.md AGENTS.md VISION.md ROADMAP.md docs/ prompts/ references/ examples/ attestation/
+        run: markdownlint README.md CHANGELOG.md RELEASING.md CONTRIBUTING.md CODE_OF_CONDUCT.md AGENTS.md VISION.md ROADMAP.md docs/ prompts/ references/ examples/ attestation/
 
   tests:
     name: unit tests
@@ -40,5 +40,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install with dev extras (jsonschema + mcp enable contract validation + the MCP tests)
+        run: pip install ".[dev]"
       - name: Run unit tests
         run: python3 -m unittest discover -s tests -t .
