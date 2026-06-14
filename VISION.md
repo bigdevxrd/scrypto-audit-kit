@@ -54,7 +54,7 @@ Honesty is the moat. A tool that reliably says "here's what I checked and here's
 **Structured output is the substrate.** Findings become JSON with a stable schema and stable IDs; the human-readable markdown is just a *render* of that JSON. Everything else — the badge, the fix-loop, the on-chain attestation — consumes the JSON. This is foundation move zero.
 
 **The kit becomes a capability any agent can pick up**, via three surfaces:
-- an **MCP server** (`audit_package`, `get_findings`, `verify_finding`, `reaudit_diff`) so any MCP-aware agent can use the kit as a tool;
+- an **MCP server** (`static_scan`, `audit_package`, `get_findings`, `show_finding_source`, `reaudit_diff`, … — nine tools) so any MCP-aware agent can use the kit as a tool;
 - a **Claude Code skill / plugin** for one-command use inside a coding session;
 - an **`AGENTS.md`** the repo advertises, so any agent that lands in a user's Scrypto project knows to pull the kit in.
 

@@ -29,7 +29,7 @@ Start with what you want to do.
 | If you want to… | Read |
 |---|---|
 | See how the pieces fit together | [architecture.md](architecture.md) |
-| Understand the strategy and honest scope | [../VISION.md](../VISION.md) · [../ROADMAP.md](../ROADMAP.md) |
+| Understand the strategy, status, and history | [../VISION.md](../VISION.md) · [../ROADMAP.md](../ROADMAP.md) · [../CHANGELOG.md](../CHANGELOG.md) |
 | Know exactly what it does and doesn't catch | [README — Limitations](../README.md#limitations--read-this-before-relying-on-the-output) |
 | Contribute | [../CONTRIBUTING.md](../CONTRIBUTING.md) · [../AGENTS.md](../AGENTS.md) (agents) |
 

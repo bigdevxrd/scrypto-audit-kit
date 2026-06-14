@@ -21,7 +21,7 @@ Anything unchecked is fair game — open an issue to claim it.
 
 ## Phase 2 — Agentic ✅ (v0.2)
 
-- [x] MCP server — `audit_package`, `get_findings`, `reaudit_diff`, `gate`, `get_checklist`, `show_finding_source`
+- [x] MCP server — `audit_package`, `get_findings`, `reaudit_diff`, `gate`, `get_checklist`, `show_finding_source` (now 9 — `static_scan`, `propose_tests`, `attestation_payload` added in later phases)
 - [x] Claude Code skill (`scrypto-pre-audit`) + `.mcp.json`
 - [x] `AGENTS.md` convention so any agent can self-serve the kit
 - [x] audit → fix → re-verify loop (read-only auditor + supervised fixer)
@@ -37,6 +37,13 @@ Anything unchecked is fair game — open an issue to claim it.
 - [x] On-chain attestation blueprint — type-checks + CI-compiled, **not yet deployed/audited** (soulbound; source-hash anchor) + the `attest.py` manifest bridge ([attestation/](attestation/))
 - [ ] Build/deploy the registry to Stokenet + a public dashboard of attested blueprints
 - [ ] Auditor partnership (pre-audit funnel) + Radix grant
+
+## Phase 5 — Developer experience ✅ (v0.5)
+
+- [x] Pip-installable package (`scrypto_audit_kit`) — importable deterministic core + `sak-*` console scripts ([docs/sdk.md](docs/sdk.md))
+- [x] Formal JSON-schema contracts for all 9 MCP tools ([schema/mcp-tools.schema.json](schema/mcp-tools.schema.json))
+- [x] Runnable example agents — CI gate, audit → fix → verify, MCP client ([examples/agents/](examples/agents/))
+- [x] Documentation suite — quickstart · SDK · MCP tools · architecture ([docs/](docs/README.md))
 
 ---
 

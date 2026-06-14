@@ -5,7 +5,7 @@ Guidance for AI agents working with this repo. (Human contributors: see
 
 `scrypto-audit-kit` is a **pre-audit** toolkit for [Scrypto](https://docs.radixdlt.com/docs/scrypto-1)
 blueprints on Radix. Use it to help a user security-review and harden a Scrypto
-package before they pay for a human audit. It is rung L1–L2 of a trust ladder, not
+package before they pay for a human audit. It is rung L1–L3 of a trust ladder, not
 a safety guarantee — see [VISION.md](VISION.md). Never tell a user their code is "safe";
 report what was checked and what's residual.
 
@@ -33,6 +33,6 @@ the `scrypto-audit-kit` server exposes `static_scan` (free, no API), `audit_pack
 
 ## Working on the kit itself
 
-- **Layout:** `audit.sh` (harness) · `prompts/` (audit prompt + 11-class checklist) · `references/` (pattern catalogue) · `bin/` (`sak_lib.py` shared logic, `mcp_server.py`, `extract-report.py`, `ci-gate.py`) · `schema/` · `tests/` · `examples/vulnerable-vault` (planted-bug fixture).
+- **Layout:** `audit.sh` (harness) · `prompts/` (audit prompt + 11-class checklist) · `references/` (pattern catalogue) · `bin/` (the `scrypto_audit_kit` package — `sak_lib.py` shared logic, `static_analysis.py`, `mcp_server.py`, `attest.py`, `gen_tests.py`, …) · `schema/` · `tests/` · `examples/` (planted-bug fixture + runnable example agents). Build on it via the Python API ([docs/sdk.md](docs/sdk.md)) or the MCP tools ([docs/mcp-tools.md](docs/mcp-tools.md)).
 - **Before committing:** `make lint` (shellcheck + markdownlint + py_compile) and `make test` (stdlib unittest). CI runs both.
 - **Invariants:** the auditor never edits code under review; references must be public + permissively licensed with a provenance header; prompts optimise for signal, not finding count. See [CONTRIBUTING.md](CONTRIBUTING.md) for what won't be merged.

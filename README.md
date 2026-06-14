@@ -26,7 +26,18 @@ The kit is **read-only by design**. It produces reports; it does not edit your b
 
 ## Quickstart
 
-### Requirements
+```bash
+pip install scrypto-audit-kit        # the deterministic toolkit + MCP server, no API key needed
+# ...or clone for the full LLM audit harness (audit.sh):
+git clone https://github.com/bigdevxrd/scrypto-audit-kit
+```
+
+The pip package gives you the free static analysis, test-scaffold generation, the attestation
+bridge, and the MCP server — importable and as `sak-*` commands. The full `./audit.sh` (the LLM
+checklist pass) lives in the clone. **[docs/quickstart.md](docs/quickstart.md)** walks all three
+tiers end to end.
+
+### Requirements (for the full `./audit.sh` audit)
 
 - [aider](https://aider.chat) (`pip install aider-chat` — version 0.86 or newer)
 - An Anthropic API key (the kit defaults to Claude Sonnet 4.6 — get one at <https://console.anthropic.com>)
@@ -157,7 +168,22 @@ pip install "mcp[cli]"
 claude mcp add --transport stdio scrypto-audit-kit -- python3 "$PWD/bin/mcp_server.py"
 ```
 
-Tools: `static_scan` (free), `audit_package`, `propose_tests`, `attestation_payload`, `get_findings`, `show_finding_source`, `reaudit_diff`, `gate`, `get_checklist`. There's also a Claude Code skill (`/scrypto-pre-audit`) and an [AGENTS.md](AGENTS.md) playbook for any agent. Full setup — including the audit→fix→verify loop — in [docs/agents.md](docs/agents.md).
+Tools: `static_scan` (free), `audit_package`, `propose_tests`, `attestation_payload`, `get_findings`, `show_finding_source`, `reaudit_diff`, `gate`, `get_checklist`. There's also a Claude Code skill (`/scrypto-pre-audit`) and an [AGENTS.md](AGENTS.md) playbook for any agent. Full setup — including the audit→fix→verify loop — in [docs/agents.md](docs/agents.md); the nine tools and their formal contracts are in [docs/mcp-tools.md](docs/mcp-tools.md).
+
+### Build on it — the Python SDK
+
+`pip install scrypto-audit-kit` makes the deterministic core importable, with zero required
+dependencies:
+
+```python
+from scrypto_audit_kit import static_analysis, sak_lib
+findings = static_analysis.analyze_package("path/to/package")     # free, no API key
+verdict  = sak_lib.gate_verdict(sak_lib.build_report(findings), "high")
+```
+
+The full API, the nine tools in-process, and the `sak-*` console scripts are in
+[docs/sdk.md](docs/sdk.md). Three runnable example agents — a free-tier CI gate, the
+audit→fix→verify loop, and an MCP client — are in [examples/agents/](examples/agents/).
 
 ### Generate tests, attest on-chain
 
@@ -170,6 +196,7 @@ Tools: `static_scan` (free), `audit_package`, `propose_tests`, `attestation_payl
 scrypto-audit-kit/
 ├── audit.sh                The harness — wraps aider with the right flags + context.
 ├── Makefile                Convenience targets (audit, lint, test, check-deps).
+├── pyproject.toml          Pip packaging — importable SDK + sak-* console scripts.
 ├── VERSION                 Kit version, stamped into every report.
 ├── VISION.md / ROADMAP.md  The trust-ladder strategy + the live phase checklist.
 ├── AGENTS.md               How an agent should drive the kit (audit → fix → verify).
@@ -179,17 +206,30 @@ scrypto-audit-kit/
 │   ├── audit.md            Auditor-role prompt + report structure (incl. the JSON appendix).
 │   └── checklist.md        Eleven vulnerability classes with concrete questions per class.
 ├── references/             Read-only context — production patterns + threat models (5 files).
-├── schema/                 JSON Schema for the machine-readable report.
+├── schema/                 JSON Schemas — the report + the MCP tool contracts.
 ├── bin/                    engine + tools: static_analysis.py, gen_tests.py, attest.py, mcp_server.py, …
 ├── tests/                  Stdlib unit tests for the tooling (`make test`).
-├── docs/                   ci.md (CI + badge) · agents.md (MCP + the fix loop).
+├── docs/                   The docs suite (quickstart · sdk · mcp-tools · architecture · …).
 ├── attestation/            On-chain attestation registry blueprint (Scrypto, L3).
 ├── .claude/skills/         The scrypto-pre-audit Claude Code skill.
 ├── audit-reports/          Output dir, gitignored.
 └── examples/
     ├── vulnerable-vault/   Deliberately-vulnerable fixture + its committed report.
+    ├── agents/             Runnable example agents (CI gate, audit→fix→verify, MCP client).
     └── ci/                 Drop-in pre-audit workflow for your repo.
 ```
+
+## Documentation
+
+Everything is in **[docs/](docs/README.md)**; the short list:
+
+- [quickstart.md](docs/quickstart.md) — install + run, all three tiers
+- [static-analysis.md](docs/static-analysis.md) — the deterministic rules (and adding one)
+- [agents.md](docs/agents.md) · [mcp-tools.md](docs/mcp-tools.md) — drive it from an agent / over MCP
+- [sdk.md](docs/sdk.md) — the Python API + console scripts
+- [ci.md](docs/ci.md) — CI gate + badge
+- [architecture.md](docs/architecture.md) — how the pieces fit together
+- [VISION.md](VISION.md) · [ROADMAP.md](ROADMAP.md) · [CHANGELOG.md](CHANGELOG.md) — strategy, status, history
 
 ## Limitations — read this before relying on the output
 
