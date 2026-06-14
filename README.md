@@ -6,7 +6,7 @@
 [![status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#limitations--read-this-before-relying-on-the-output)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-Pre-audit harness for [Scrypto](https://docs.radixdlt.com/docs/scrypto-1) blueprints on the Radix network. Runs an LLM-driven static analysis against a curated checklist + reference patterns, and produces a markdown findings report that you can hand to a human auditor (or use to fix issues yourself).
+Pre-audit harness for [Scrypto](https://docs.radixdlt.com/docs/scrypto-1) blueprints on the Radix network. Runs a **hybrid analysis** — deterministic static rules plus an LLM pass over a curated checklist + reference patterns — and produces a findings report (markdown + JSON) you can hand to a human auditor (or use to fix issues yourself). The static pass alone is free and needs no API key.
 
 This is a **pre-audit** tool, not an audit. It catches the kinds of issues a careful reviewer would catch on a first read so that paid auditors can spend their time on the harder, second-read findings. **It does not replace a human audit before mainnet deployment.**
 
@@ -16,10 +16,11 @@ This is a **pre-audit** tool, not an audit. It catches the kinds of issues a car
 
 For each scrypto package you point it at, the kit:
 
-1. Loads the package's source (Cargo.toml + everything under `src/` and `tests/`) into an [aider](https://aider.chat) session.
-2. Loads a vulnerability **checklist** (11 classes — auth, reentrancy, decimal, resource handling, time, state machine, external calls, upgrade, oracle, slippage, allowances) and a catalogue of **reference patterns** (Ignition, CaviarNine HyperStake, subintents, a strategy-vault threat model, general scrypto knowledge) as read-only context.
-3. Asks Claude Sonnet 4.6 to produce a structured findings report — summary, findings (Critical → Info), checklist coverage walk, pattern conformance check, test-coverage gaps, open questions for the human auditor.
-4. Writes a markdown report to `audit-reports/<repo>-<package>-<date>.md` **and** a machine-readable `report.json` ([schema](schema/audit-report.schema.json)) that agents and the CI gate consume.
+1. Runs a **deterministic static pass** (free, no API) — a curated set of high-precision Scrypto rules (unbounded drains, no-owner globalize, self-rotating roles, floats, hardcoded addresses, …).
+2. Loads the package's source (Cargo.toml + everything under `src/` and `tests/`) into an [aider](https://aider.chat) session.
+3. Loads a vulnerability **checklist** (11 classes — auth, reentrancy, decimal, resource handling, time, state machine, external calls, upgrade, oracle, slippage, allowances) and a catalogue of **reference patterns** (Ignition, CaviarNine HyperStake, subintents, a strategy-vault threat model, general scrypto knowledge) as read-only context.
+4. Asks Claude Sonnet 4.6 to produce a structured findings report — summary, findings (Critical → Info), checklist coverage walk, pattern conformance check, test-coverage gaps, open questions for the human auditor.
+5. Merges both passes and writes a markdown report to `audit-reports/<repo>-<package>-<date>.md` **and** a machine-readable `report.json` ([schema](schema/audit-report.schema.json)) that agents and the CI gate consume.
 
 The kit is **read-only by design**. It produces reports; it does not edit your blueprint. Edits to audit-grade code must go through a separate, human-supervised session.
 
@@ -106,19 +107,29 @@ The default is Claude Sonnet 4.6. A `--model` flag selects the analysis model:
 context, and tags findings both models agree on as HIGH confidence. Use it when
 you want a second opinion on a high-stakes blueprint.
 
-### Try it on the bundled example
+### Free tier: deterministic static analysis
 
-The repo ships a deliberately-vulnerable blueprint so you can see real output without writing any code:
+A static pass runs on every audit, and you can run it *alone* with **no API key, no aider, and no toolchain**:
 
 ```bash
-./audit.sh --no-compile-check examples/vulnerable-vault
+./audit.sh --static-only <path>     # free, instant, deterministic
+```
+
+It applies a curated set of high-precision Scrypto rules (comment/string-aware, so it never matches inside a comment or a string literal) and writes the same `report.json`. Suppress a finding with a `// sak:allow <rule-id>` comment; add `--no-static` to a full run to skip the pass. See [docs/static-analysis.md](docs/static-analysis.md) for the rule list and how to add one.
+
+### Try it on the bundled example
+
+The repo ships a deliberately-vulnerable blueprint so you can see real output without writing any code — the static tier needs no API key:
+
+```bash
+./audit.sh --static-only examples/vulnerable-vault   # free; drop --static-only for the full hybrid run
 ```
 
 The expected result is committed beside it — [`examples/vulnerable-vault.pre-audit.md`](examples/vulnerable-vault.pre-audit.md) (human) and [`.json`](examples/vulnerable-vault.pre-audit.json) (machine-readable). Every `file:line` in it is exact, because the bugs are planted.
 
 ### Machine-readable output
 
-Alongside the markdown, the kit writes `report.json` conforming to [`schema/audit-report.schema.json`](schema/audit-report.schema.json) — stable `F-###` ids, severities, full checklist coverage, and a provenance block (kit version, model, checklist version, and a sha256 of the analyzed source). This is what agents, the CI gate, and (later) on-chain attestation consume; the markdown is a render of it.
+Alongside the markdown, the kit writes `report.json` conforming to [`schema/audit-report.schema.json`](schema/audit-report.schema.json) — stable ids (`F-###` from the LLM, `S-###` from the static pass, each tagged with its `source`), severities, full checklist coverage, and a provenance block (kit version, model, checklist version, and a sha256 of the analyzed source). This is what agents, the CI gate, and (later) on-chain attestation consume; the markdown is a render of it.
 
 ### Continuous integration & a badge
 
@@ -146,7 +157,7 @@ pip install "mcp[cli]"
 claude mcp add --transport stdio scrypto-audit-kit -- python3 "$PWD/bin/mcp_server.py"
 ```
 
-Tools: `audit_package`, `get_findings`, `show_finding_source`, `reaudit_diff`, `gate`, `get_checklist`. There's also a Claude Code skill (`/scrypto-pre-audit`) and an [AGENTS.md](AGENTS.md) playbook for any agent. Full setup — including the audit→fix→verify loop — in [docs/agents.md](docs/agents.md).
+Tools: `static_scan` (free, no API), `audit_package`, `get_findings`, `show_finding_source`, `reaudit_diff`, `gate`, `get_checklist`. There's also a Claude Code skill (`/scrypto-pre-audit`) and an [AGENTS.md](AGENTS.md) playbook for any agent. Full setup — including the audit→fix→verify loop — in [docs/agents.md](docs/agents.md).
 
 ## What's in the kit
 
@@ -164,7 +175,7 @@ scrypto-audit-kit/
 │   └── checklist.md        Eleven vulnerability classes with concrete questions per class.
 ├── references/             Read-only context — production patterns + threat models (5 files).
 ├── schema/                 JSON Schema for the machine-readable report.
-├── bin/                    sak_lib.py (shared logic) · mcp_server.py · extract-report.py · ci-gate.py
+├── bin/                    static_analysis.py · sak_lib.py · mcp_server.py · extract-report.py · ci-gate.py
 ├── tests/                  Stdlib unit tests for the tooling (`make test`).
 ├── docs/                   ci.md (CI + badge) · agents.md (MCP + the fix loop).
 ├── .claude/skills/         The scrypto-pre-audit Claude Code skill.

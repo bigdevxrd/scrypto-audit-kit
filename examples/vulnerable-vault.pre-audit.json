@@ -40,7 +40,8 @@
       "why": "Total, immediate loss of all deposited XRD, by anyone.",
       "suggested_direction": "Gate behind admin or a dedicated owner role and bound it with a per-call cap and epoch cooldown rather than draining everything at once.",
       "confidence": "high",
-      "status": "open"
+      "status": "open",
+      "source": "llm"
     },
     {
       "id": "F-002",
@@ -52,7 +53,8 @@
       "why": "An attacker sets a favourable price, mints or redeems shares, and extracts value — a second drain path independent of F-001.",
       "suggested_direction": "Make price updates privileged, source from a real multi-source oracle, and add staleness and deviation bounds before a price is usable.",
       "confidence": "high",
-      "status": "open"
+      "status": "open",
+      "source": "llm"
     },
     {
       "id": "F-003",
@@ -64,7 +66,8 @@
       "why": "The first deposit always reverts (the vault cannot be bootstrapped), and the formula is wrong even when it does not panic.",
       "suggested_direction": "Special-case the first deposit, use checked_mul/checked_div, and define an explicit share formula with documented vault-favouring rounding.",
       "confidence": "high",
-      "status": "open"
+      "status": "open",
+      "source": "llm"
     },
     {
       "id": "F-004",
@@ -76,7 +79,8 @@
       "why": "If pause does not cover exits it cannot contain an incident, and it leaves F-002's price-manipulation drain unstoppable.",
       "suggested_direction": "Assert !self.paused at the top of withdraw and any other value-moving method so the circuit breaker covers exits.",
       "confidence": "high",
-      "status": "open"
+      "status": "open",
+      "source": "llm"
     },
     {
       "id": "F-005",
@@ -88,7 +92,8 @@
       "why": "The minimum-pause window is half what is documented, weakening the delay the brake is meant to provide.",
       "suggested_direction": "Compare against unlock_epoch + 2 and add an at-boundary test so the enforced delay matches intent.",
       "confidence": "high",
-      "status": "open"
+      "status": "open",
+      "source": "llm"
     },
     {
       "id": "F-006",
@@ -100,7 +105,8 @@
       "why": "A compromised or fat-fingered admin is unrecoverable; there is no owner to rotate or freeze it.",
       "suggested_direction": "Introduce an owner role that governs admin, and make admin updatable_by the owner only.",
       "confidence": "high",
-      "status": "open"
+      "status": "open",
+      "source": "llm"
     },
     {
       "id": "F-007",
@@ -112,7 +118,8 @@
       "why": "A bad or malicious fee can make the vault unusable or silently expropriate depositors.",
       "suggested_direction": "Assert an explicit ceiling (e.g. bps <= dec!(1000)) and reject out-of-range values.",
       "confidence": "high",
-      "status": "open"
+      "status": "open",
+      "source": "llm"
     },
     {
       "id": "F-008",
@@ -124,7 +131,8 @@
       "why": "Off-chain indexers and monitors cannot observe deposits, redemptions, price changes, or drains, which also hampers incident detection for F-001/F-002.",
       "suggested_direction": "Define and emit an event for each state change, including amounts and the resource address.",
       "confidence": "high",
-      "status": "open"
+      "status": "open",
+      "source": "llm"
     }
   ],
   "checklist_coverage": [

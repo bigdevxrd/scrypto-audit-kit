@@ -27,9 +27,9 @@ Anything unchecked is fair game — open an issue to claim it.
 - [x] audit → fix → re-verify loop (read-only auditor + supervised fixer)
 - [ ] Real-world shakedown — drive the loop on a live blueprint end-to-end *(needs an API key)*
 
-## Phase 3 — Deterministic
+## Phase 3 — Deterministic 🚧 (v0.3)
 
-- [ ] Hybrid static-analysis pass (the "Slither for Scrypto")
+- [x] Hybrid static-analysis pass — 9 high-precision rules, a free `--static-only` tier, and the `static_scan` tool ([docs/static-analysis.md](docs/static-analysis.md))
 - [ ] Property-test generation (`scrypto-test`) for flagged invariants
 
 ## Phase 4 — Verifiable & connected

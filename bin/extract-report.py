@@ -105,6 +105,8 @@ def main():
     span = None
     if blocks:
         span, obj = blocks[-1]
+        for f in obj.get("findings", []):
+            f.setdefault("source", "llm")
         if static_findings:  # hybrid run — merge static into the LLM findings
             obj["findings"] = sak_lib.merge_findings(obj.get("findings", []), static_findings)
     elif static_findings:

@@ -12,8 +12,8 @@ report what was checked and what's residual.
 ## Using the kit to audit a package
 
 **Via the MCP server** (preferred — see [docs/agents.md](docs/agents.md) to connect it):
-the `scrypto-audit-kit` server exposes `audit_package`, `get_findings`,
-`show_finding_source`, `reaudit_diff`, `gate`, and `get_checklist`.
+the `scrypto-audit-kit` server exposes `static_scan` (free, no API),
+`audit_package`, `get_findings`, `show_finding_source`, `reaudit_diff`, `gate`, and `get_checklist`.
 
 **Via the CLI:**
 
@@ -24,7 +24,7 @@ the `scrypto-audit-kit` server exposes `audit_package`, `get_findings`,
 
 ### The loop: audit → fix → re-verify
 
-1. **Audit** the package (`audit_package` or `./audit.sh`). Summarize findings by severity.
+1. **Static scan first** — `static_scan` (or `./audit.sh --static-only`) is free and instant; run it before spending a model call. Then **audit** for semantic findings (`audit_package` or `./audit.sh`). Summarize by severity.
 2. **Verify each citation** with `show_finding_source` before acting — the model can hallucinate `file:line`.
 3. **Fix one finding at a time**, minimally, with the user's review. The kit's auditor is read-only; *you* make edits, the user owns audit-grade changes.
 4. **Re-verify** with `reaudit_diff` against the baseline report — confirm findings closed and nothing new appeared.

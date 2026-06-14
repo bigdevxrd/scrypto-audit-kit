@@ -199,6 +199,7 @@ def render_findings_md(findings, heading):
     for f in findings:
         rule = f"  ·  rule `{f['rule']}`" if f.get("rule") else ""
         out.append(f"### {f.get('id', '?')} — {f.get('title', '')}")
+        out.append("")
         out.append(f"**{f.get('severity', '?')}** · {f.get('class', '?')} · `{f.get('location', '?')}`{rule}")
         out.append("")
         for label, key in (("What", "what"), ("Why it matters", "why"), ("Suggested direction", "suggested_direction")):
