@@ -42,6 +42,11 @@ class TestMcpTools(unittest.TestCase):
         self.assertIn("Auth bypass", text)
         self.assertIn("checklist-version", text)
 
+    def test_static_scan(self):
+        res = mcp_server.static_scan(PKG)
+        self.assertEqual(res["count"], 3)
+        self.assertTrue(all(f["source"] == "static" for f in res["findings"]))
+
     def test_show_finding_source(self):
         res = mcp_server.show_finding_source(SAMPLE, "F-003", package_path=PKG, context=2)
         self.assertEqual(res["finding"]["id"], "F-003")

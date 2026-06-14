@@ -144,3 +144,65 @@ def read_source_span(base_dir, location, context=3):
         for i in range(start, end + 1)
     )
     return {"file": file_part, "line": line, "snippet": snippet}
+
+
+def worst_severity(findings):
+    """The highest severity label present in a findings list, or None."""
+    worst = max((_rank(f) for f in findings), default=0)
+    return next((k for k, v in SEV_RANK.items() if v == worst), None) if worst else None
+
+
+def merge_findings(primary, extra):
+    """Append `extra` findings to `primary`, skipping any whose (class, title) signature is
+    already present (so the static pass doesn't duplicate what the LLM already flagged).
+    Returns a new list: primary order preserved, then the genuinely-new extras."""
+    seen = {finding_signature(f) for f in primary}
+    merged = list(primary)
+    for f in extra:
+        sig = finding_signature(f)
+        if sig not in seen:
+            merged.append(f)
+            seen.add(sig)
+    return merged
+
+
+def build_report(findings):
+    """Assemble a minimal schema-shaped report dict from a findings list alone — used when
+    there is no LLM pass (the static-only tier). Provenance (kit/target) is stamped separately."""
+    by_class = {}
+    for f in findings:
+        by_class.setdefault(f.get("class", "?"), []).append(f.get("id", "?"))
+    coverage = [{"class": c, "status": "findings", "findings": ids} for c, ids in sorted(by_class.items())]
+    return {
+        "schema_version": "1.0",
+        "kit": {},
+        "target": {},
+        "summary": {
+            "overall_risk": worst_severity(findings) or "info",
+            "one_liner": f"Static-only pre-audit: {len(findings)} deterministic finding(s). "
+                         "Run the full pre-audit (with an API key) for semantic findings and full checklist coverage.",
+        },
+        "findings": findings,
+        "checklist_coverage": coverage,
+        "open_questions": [
+            "Static-only tier — deterministic rules only, not the full LLM checklist walk. "
+            "Run `./audit.sh` for semantic coverage.",
+        ],
+    }
+
+
+def render_findings_md(findings, heading):
+    """Render a findings list as a markdown section (used for the static report + merge section)."""
+    out = [f"## {heading}", ""]
+    if not findings:
+        return "\n".join(out + ["_None._", ""])
+    for f in findings:
+        rule = f"  ·  rule `{f['rule']}`" if f.get("rule") else ""
+        out.append(f"### {f.get('id', '?')} — {f.get('title', '')}")
+        out.append(f"**{f.get('severity', '?')}** · {f.get('class', '?')} · `{f.get('location', '?')}`{rule}")
+        out.append("")
+        for label, key in (("What", "what"), ("Why it matters", "why"), ("Suggested direction", "suggested_direction")):
+            if f.get(key):
+                out.append(f"- **{label}:** {f[key]}")
+        out.append("")
+    return "\n".join(out)

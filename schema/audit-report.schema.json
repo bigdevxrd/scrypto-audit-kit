@@ -55,7 +55,7 @@
         "additionalProperties": false,
         "required": ["id", "severity", "class", "location", "what", "why", "suggested_direction", "confidence"],
         "properties": {
-          "id": { "type": "string", "pattern": "^F-[0-9]{3}$" },
+          "id": { "type": "string", "pattern": "^[FS]-[0-9]{3}$", "description": "F-### from the LLM pass, S-### from the static pass" },
           "severity": { "$ref": "#/$defs/severity" },
           "class": { "type": "string", "description": "one of the checklist class names" },
           "location": { "type": "string", "description": "path/to/file.rs:line" },
@@ -64,7 +64,9 @@
           "why": { "type": "string" },
           "suggested_direction": { "type": "string", "description": "remediation direction in prose — never a code patch" },
           "confidence": { "enum": ["high", "medium", "low"] },
-          "status": { "enum": ["open", "fixed", "wontfix", "false_positive"], "default": "open" }
+          "status": { "enum": ["open", "fixed", "wontfix", "false_positive"], "default": "open" },
+          "source": { "enum": ["llm", "static"], "description": "which engine produced this finding" },
+          "rule": { "type": "string", "description": "static rule id, when source is static" }
         }
       }
     },
@@ -80,7 +82,7 @@
           "class": { "type": "string" },
           "status": { "enum": ["clean", "not_applicable", "findings"] },
           "note": { "type": "string" },
-          "findings": { "type": "array", "items": { "type": "string", "pattern": "^F-[0-9]{3}$" } }
+          "findings": { "type": "array", "items": { "type": "string", "pattern": "^[FS]-[0-9]{3}$" } }
         }
       }
     },

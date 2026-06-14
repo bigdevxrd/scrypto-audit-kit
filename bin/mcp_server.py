@@ -18,6 +18,7 @@ import subprocess
 import sys
 
 import sak_lib
+import static_analysis
 
 KIT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AUDIT_SH = os.path.join(KIT_DIR, "audit.sh")
@@ -124,6 +125,23 @@ def get_checklist() -> str:
         return fh.read()
 
 
+def static_scan(package_path: str) -> dict:
+    """Run only the deterministic static analysis — free, no API key, no model call.
+
+    A fast, reproducible first pass that catches mechanical Scrypto footguns (unbounded
+    drains, no-owner globalize, self-rotating roles, floats, hardcoded addresses, ...).
+    Use it to triage cheaply before audit_package, or on its own.
+
+    Args:
+        package_path: Path to the Scrypto package (a dir with a src/ folder).
+
+    Returns:
+        {count, counts, findings} from the static rules (each finding has source="static").
+    """
+    findings = static_analysis.analyze_package(package_path)
+    return {"count": len(findings), "counts": sak_lib.severity_counts(findings), "findings": findings}
+
+
 def show_finding_source(report_path: str, finding_id: str, package_path: str = "",
                         context: int = 3) -> dict:
     """Show the source a finding cites, so you can verify the citation before acting on it.
@@ -145,7 +163,7 @@ def show_finding_source(report_path: str, finding_id: str, package_path: str = "
     return {"finding": finding, "source": sak_lib.read_source_span(base, finding.get("location", ""), context)}
 
 
-TOOLS = (audit_package, get_findings, reaudit_diff, gate, get_checklist, show_finding_source)
+TOOLS = (audit_package, static_scan, get_findings, reaudit_diff, gate, get_checklist, show_finding_source)
 
 
 def _import_fastmcp():

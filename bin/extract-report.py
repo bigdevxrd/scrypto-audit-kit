@@ -21,6 +21,8 @@ import json
 import re
 import sys
 
+import sak_lib
+
 FENCE_RE = re.compile(r"```(?:json)?\s*\n(.*?)\n```", re.DOTALL)
 
 
@@ -85,21 +87,35 @@ def main():
     ap.add_argument("--files", type=int, default=0)
     ap.add_argument("--generated-at", default="")
     ap.add_argument("--schema", default="", help="optional schema path for soft validation")
+    ap.add_argument("--static-json", default="", help="optional JSON file of static findings to merge in")
     args = ap.parse_args()
 
     with open(args.raw, encoding="utf-8") as fh:
         raw = fh.read()
 
-    blocks = extract_json_blocks(raw)
+    static_findings = []
+    if args.static_json:
+        try:
+            with open(args.static_json, encoding="utf-8") as fh:
+                static_findings = json.load(fh)
+        except (OSError, ValueError) as exc:
+            print(f"warn: could not read static findings {args.static_json}: {exc}", file=sys.stderr)
 
-    if not blocks:
-        # No structured block — keep the human report, skip JSON. Never fail the pipeline.
+    blocks = extract_json_blocks(raw)
+    span = None
+    if blocks:
+        span, obj = blocks[-1]
+        if static_findings:  # hybrid run — merge static into the LLM findings
+            obj["findings"] = sak_lib.merge_findings(obj.get("findings", []), static_findings)
+    elif static_findings:
+        # No LLM block — assemble the report from the static findings alone (static-only tier).
+        obj = sak_lib.build_report(static_findings)
+    else:
+        # Neither — keep the human report, skip JSON. Never fail the pipeline.
         with open(args.out_md, "w", encoding="utf-8") as fh:
             fh.write(raw if raw.endswith("\n") else raw + "\n")
         print("warn: no machine-readable JSON block found — wrote markdown only", file=sys.stderr)
         return 0
-
-    span, obj = blocks[-1]
 
     # Stamp authoritative provenance — overrides whatever the model put there.
     obj["schema_version"] = "1.0"
@@ -130,8 +146,11 @@ def main():
         json.dump(obj, fh, indent=2, ensure_ascii=False)
         fh.write("\n")
 
-    # Cleaned markdown with a provenance header comment.
-    cleaned = strip_json_appendix(raw, span)
+    # Cleaned markdown: the human body (minus the JSON appendix) + a static-findings section.
+    cleaned = strip_json_appendix(raw, span) if span is not None else (raw.rstrip() + "\n")
+    if static_findings:
+        cleaned = cleaned.rstrip() + "\n\n" + sak_lib.render_findings_md(
+            static_findings, "Static analysis (deterministic)")
     header = (
         f"<!-- scrypto-audit-kit {args.kit_version} · model {args.model} · "
         f"checklist {args.checklist_version} · source {args.source_hash[:12]} · {args.generated_at} -->\n"
@@ -144,7 +163,8 @@ def main():
     for f in findings:
         by_sev[f.get("severity", "?")] = by_sev.get(f.get("severity", "?"), 0) + 1
     sev_str = ", ".join(f"{k}:{v}" for k, v in sorted(by_sev.items())) or "none"
-    print(f"report.json: {len(findings)} findings ({sev_str})")
+    extra = f"; {len(static_findings)} from static" if static_findings else ""
+    print(f"report.json: {len(findings)} findings ({sev_str}){extra}")
     return 0
 
 

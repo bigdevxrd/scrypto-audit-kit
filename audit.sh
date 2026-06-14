@@ -3,12 +3,12 @@
 # scrypto-audit-kit — pre-audit harness for Scrypto blueprints
 #
 # Usage:
-#   ./audit.sh [--model claude|deepseek|both] <path-to-scrypto-package>
+#   ./audit.sh [--model claude|deepseek|both] [--static-only] [--no-static] <package>
 #
 # Example:
 #   ./audit.sh /tmp/ignition/packages/simple-oracle
+#   ./audit.sh --static-only ~/scrypto/my-vault        # free, no API key, deterministic
 #   ./audit.sh --model both /path/to/your/scrypto/package
-#   ./audit.sh --model deepseek ~/scrypto/my-vault
 #
 # What it does:
 #   1. Validates the target is a scrypto package (has Cargo.toml + src/lib.rs)
@@ -24,38 +24,11 @@
 
 set -euo pipefail
 
-# ---- API key sourcing -------------------------------------------------------
-# Aider needs ANTHROPIC_API_KEY. We support three sources, in order:
-#   1. Already exported in the calling shell (preferred for CI)
-#   2. AIDER_ENV_FILE pointing at an env file to source
-#   3. .env in the kit dir (aider auto-loads it from cwd anyway, but we source
-#      it ourselves so this script can detect failure early)
-# The key is never echoed.
-if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-  if [[ -n "${AIDER_ENV_FILE:-}" && -f "$AIDER_ENV_FILE" ]]; then
-    set -a
-    # shellcheck source=/dev/null
-    . "$AIDER_ENV_FILE"
-    set +a
-  elif [[ -f "$(dirname "$0")/.env" ]]; then
-    set -a
-    # shellcheck source=/dev/null
-    . "$(dirname "$0")/.env"
-    set +a
-  fi
-fi
-if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-  echo "error: ANTHROPIC_API_KEY not set." >&2
-  echo "       Options:" >&2
-  echo "         export ANTHROPIC_API_KEY=sk-ant-..." >&2
-  echo "         AIDER_ENV_FILE=/path/to/.env ./audit.sh ..." >&2
-  echo "         drop a .env file with ANTHROPIC_API_KEY=... in the kit dir" >&2
-  exit 1
-fi
-
 # ---- arg parsing ------------------------------------------------------------
 MODEL="claude"
 SKIP_COMPILE=0
+STATIC_ONLY=0
+NO_STATIC=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
@@ -67,6 +40,9 @@ while [[ $# -gt 0 ]]; do
       echo "                       (deep) and cross-references findings."
       echo "  --no-compile-check   skip the cargo wasm pre-flight (use when the"
       echo "                       toolchain isn't set up, e.g. the bundled example)"
+      echo "  --static-only        deterministic static rules only — no LLM, no API key."
+      echo "                       Free and instant."
+      echo "  --no-static          skip the deterministic static pass (LLM only)"
       exit 0
       ;;
     --model)
@@ -76,6 +52,8 @@ while [[ $# -gt 0 ]]; do
       fi
       ;;
     --no-compile-check) SKIP_COMPILE=1 ;;
+    --static-only) STATIC_ONLY=1 ;;
+    --no-static) NO_STATIC=1 ;;
     *) break ;;
   esac
   shift
@@ -95,6 +73,30 @@ TARGET="$(cd "$TARGET" && pwd)"
 # ---- locate the kit (this script's dir) -------------------------------------
 KIT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# ---- API key sourcing (skipped for --static-only) ---------------------------
+# Aider needs ANTHROPIC_API_KEY. Sources, in order: the calling shell, then
+# AIDER_ENV_FILE, then a .env in the kit dir. The key is never echoed.
+if [[ "$STATIC_ONLY" != "1" ]]; then
+  if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+    if [[ -n "${AIDER_ENV_FILE:-}" && -f "$AIDER_ENV_FILE" ]]; then
+      set -a
+      # shellcheck source=/dev/null
+      . "$AIDER_ENV_FILE"
+      set +a
+    elif [[ -f "$KIT_DIR/.env" ]]; then
+      set -a
+      # shellcheck source=/dev/null
+      . "$KIT_DIR/.env"
+      set +a
+    fi
+  fi
+  if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+    echo "error: ANTHROPIC_API_KEY not set (or use --static-only for a free, no-API pass)." >&2
+    echo "       export ANTHROPIC_API_KEY=sk-ant-...  |  AIDER_ENV_FILE=/path/.env  |  .env in the kit dir" >&2
+    exit 1
+  fi
+fi
+
 # ---- validate scrypto package shape -----------------------------------------
 if [[ ! -f "$TARGET/Cargo.toml" ]]; then
   echo "error: no Cargo.toml at $TARGET — not a scrypto package" >&2
@@ -110,7 +112,9 @@ fi
 # broken code. Uses release wasm target to match actual deploy target.
 # Skippable with --no-compile-check (e.g. the bundled example, or a toolchain
 # mismatch) — the analysis itself doesn't need a successful build.
-if [[ "$SKIP_COMPILE" == "1" ]]; then
+if [[ "$STATIC_ONLY" == "1" ]]; then
+  : # static-only needs no build
+elif [[ "$SKIP_COMPILE" == "1" ]]; then
   echo "[pre-flight] compile check skipped (--no-compile-check)"
   echo ""
 elif ! command -v cargo >/dev/null 2>&1; then
@@ -176,6 +180,9 @@ case "$MODEL" in
   both)     MODEL_DESC="deepseek/deepseek-chat + anthropic/claude-sonnet-4-6" ;;
   *)        MODEL_DESC="anthropic/claude-sonnet-4-6" ;;
 esac
+if [[ "$STATIC_ONLY" == "1" ]]; then MODE_LABEL="static-only (no LLM)"
+elif [[ "$NO_STATIC" == "1" ]]; then MODE_LABEL="$MODEL (no static)"
+else MODE_LABEL="$MODEL + static"; fi
 REPORT_JSON="${REPORT%.md}.json"
 
 # ---- collect read-only reference files --------------------------------------
@@ -187,11 +194,23 @@ while IFS= read -r f; do READ_FILES+=("$f"); done < <(find "$KIT_DIR/references"
 echo "==> scrypto-audit-kit"
 echo "    target:    $REPO / $PKG"
 echo "    path:      $TARGET"
-echo "    model:     $MODEL"
+echo "    mode:      $MODE_LABEL"
 echo "    sources:   ${#TARGET_FILES[@]} files"
 echo "    refs:      ${#READ_FILES[@]} files (read-only)"
 echo "    report ->  $REPORT"
 echo ""
+
+# ---- static analysis pass (deterministic, free, no API) ---------------------
+STATIC_FINDINGS=""
+if [[ "$STATIC_ONLY" == "1" || "$NO_STATIC" != "1" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    STATIC_FINDINGS="$KIT_DIR/audit-reports/.static-${REPO}-${PKG}-${DATE}.json"
+    python3 "$KIT_DIR/bin/static_analysis.py" --out "$STATIC_FINDINGS" "$TARGET" \
+      || { echo "warn: static analysis failed — continuing" >&2; STATIC_FINDINGS=""; }
+  elif [[ "$STATIC_ONLY" == "1" ]]; then
+    echo "error: --static-only needs python3" >&2; exit 1
+  fi
+fi
 
 # Aider flags:
 #   --no-git, --no-auto-commits, --no-dirty-commits, --no-suggest-shell-commands
@@ -219,7 +238,10 @@ run_single() {
 }
 
 # ---- run --------------------------------------------------------------------
-if [[ "$MODEL" == "both" ]]; then
+if [[ "$STATIC_ONLY" == "1" ]]; then
+  # No LLM pass — the report is built from the static findings in the extract step.
+  printf '# Audit: %s\n\n_Static-only pre-audit (deterministic rules; no LLM pass)._\n' "$PKG" > "$REPORT"
+elif [[ "$MODEL" == "both" ]]; then
   # Pass 1: DeepSeek — broad, cheap scan
   DEEPSEEK_REPORT="$REPORT.deepseek"
   echo "--- pass 1/2: DeepSeek (broad scan) ---"
@@ -319,20 +341,24 @@ fi
 # Best-effort: if python3 is missing or the model emitted no JSON block, the
 # markdown report is still produced and we simply skip report.json.
 if command -v python3 >/dev/null 2>&1; then
+  REPORT_MODEL="$MODEL_DESC"
+  if [[ "$STATIC_ONLY" == "1" ]]; then REPORT_MODEL="static-only"; fi
   python3 "$KIT_DIR/bin/extract-report.py" \
     --raw "$REPORT" --out-json "$REPORT_JSON" --out-md "$REPORT" \
-    --kit-version "$KIT_VERSION" --model "$MODEL_DESC" \
+    --kit-version "$KIT_VERSION" --model "$REPORT_MODEL" \
     --checklist-version "$CHECKLIST_VERSION" --reference-set "${#READ_FILES[@]} files" \
     --repo "$REPO" --package "$PKG" --source-hash "$SOURCE_HASH" \
     --files "${#TARGET_FILES[@]}" --generated-at "$DATE" \
+    --static-json "$STATIC_FINDINGS" \
     --schema "$KIT_DIR/schema/audit-report.schema.json" \
     || echo "warn: report.json not produced (see above)" >&2
 else
   echo "warn: python3 not found — skipping report.json (markdown still written)" >&2
 fi
+if [[ -n "$STATIC_FINDINGS" ]]; then rm -f "$STATIC_FINDINGS"; fi
 
 echo ""
 echo "==> done."
 echo "    markdown: $REPORT"
 if [[ -f "$REPORT_JSON" ]]; then echo "    json:     $REPORT_JSON"; fi
-echo "    stderr:   $REPORT.stderr"
+if [[ -f "$REPORT.stderr" ]]; then echo "    stderr:   $REPORT.stderr"; fi
