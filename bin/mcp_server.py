@@ -17,6 +17,7 @@ import re
 import subprocess
 import sys
 
+import attest
 import gen_tests
 import sak_lib
 import static_analysis
@@ -160,6 +161,31 @@ def propose_tests(package_path: str) -> dict:
     return gen_tests.propose_tests(package_path)
 
 
+def attestation_payload(report_path: str, component: str = "", account: str = "",
+                        wasm_path: str = "", level: str = "") -> dict:
+    """Build the on-chain attestation payload (and manifest) from a report — free, no API.
+
+    Bridges a pre-audit report to the L3 attestation registry: computes the source/report/wasm
+    hashes, severity counts, and level, and (when a component + account are given) renders a Radix
+    transaction manifest that calls attest(). See the attestation/ blueprint.
+
+    Args:
+        report_path: Path to a report.json.
+        component: Deployed attestation registry component address (for the manifest).
+        account: Your account address (for the manifest).
+        wasm_path: Optional path to the built blueprint wasm to hash.
+        level: Optional override for the derived level.
+
+    Returns:
+        {payload, manifest?} — manifest is included when both component and account are given.
+    """
+    payload = attest.build_payload(report_path, wasm_path, level)
+    result = {"payload": payload}
+    if component and account:
+        result["manifest"] = attest.render_manifest(payload, component, account)
+    return result
+
+
 def show_finding_source(report_path: str, finding_id: str, package_path: str = "",
                         context: int = 3) -> dict:
     """Show the source a finding cites, so you can verify the citation before acting on it.
@@ -181,8 +207,8 @@ def show_finding_source(report_path: str, finding_id: str, package_path: str = "
     return {"finding": finding, "source": sak_lib.read_source_span(base, finding.get("location", ""), context)}
 
 
-TOOLS = (audit_package, static_scan, propose_tests, get_findings, reaudit_diff, gate,
-         get_checklist, show_finding_source)
+TOOLS = (audit_package, static_scan, propose_tests, attestation_payload, get_findings,
+         reaudit_diff, gate, get_checklist, show_finding_source)
 
 
 def _import_fastmcp():
