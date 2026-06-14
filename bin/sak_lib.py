@@ -34,8 +34,24 @@ def newest_report(directory):
     return max(reports, key=os.path.getmtime)
 
 
+UNKNOWN_RANK = 99  # an unrecognised/blank severity outranks 'critical' so it can never slip under a gate
+
+
+def _norm_severity(finding):
+    return str(finding.get("severity", "")).strip().lower()
+
+
 def _rank(finding):
-    return SEV_RANK.get(str(finding.get("severity", "")).lower(), 0)
+    # fail-safe: unknown/blank severities rank above everything except an explicit `none` gate
+    return SEV_RANK.get(_norm_severity(finding), UNKNOWN_RANK)
+
+
+def _label_for_rank(rank):
+    if rank == 0:
+        return None
+    if rank == UNKNOWN_RANK:
+        return "unknown"
+    return next((k for k, v in SEV_RANK.items() if v == rank), None)
 
 
 def filter_findings(report, severity_min=None, status=None):
@@ -52,17 +68,19 @@ def filter_findings(report, severity_min=None, status=None):
 
 
 def severity_counts(findings):
-    """Count findings by severity label, e.g. {'critical': 2, 'high': 1}."""
+    """Count findings by normalised severity label, e.g. {'critical': 2, 'high': 1}."""
     counts = {}
     for f in findings:
-        sev = str(f.get("severity", "")).lower()
+        sev = _norm_severity(f)
         counts[sev] = counts.get(sev, 0) + 1
     return counts
 
 
 def counts_summary(counts):
-    """Render counts as 'critical:2, high:1' in severity order, or 'none'."""
-    return ", ".join(f"{s}:{counts[s]}" for s in SEV_ORDER if counts.get(s)) or "none"
+    """Render counts as 'critical:2, high:1' in severity order (unknown labels last), or 'none'."""
+    known = [f"{s}:{counts[s]}" for s in SEV_ORDER if counts.get(s)]
+    unknown = [f"{k or '<blank>'}:{counts[k]}" for k in counts if k not in SEV_RANK and counts[k]]
+    return ", ".join(known + unknown) or "none"
 
 
 def gate_verdict(report, fail_on="high"):
@@ -73,7 +91,7 @@ def gate_verdict(report, fail_on="high"):
     """
     fo = (fail_on or "high").lower()
     if fo == "none":
-        threshold = 99  # never fails
+        threshold = UNKNOWN_RANK + 1  # never fails on severity (not even an unknown label)
     elif fo in SEV_RANK:
         threshold = SEV_RANK[fo]
     else:
@@ -81,7 +99,7 @@ def gate_verdict(report, fail_on="high"):
 
     findings = report.get("findings", [])
     worst = max((_rank(f) for f in findings), default=0)
-    worst_label = next((k for k, v in SEV_RANK.items() if v == worst), None) if worst else None
+    worst_label = _label_for_rank(worst)
     return {
         "passed": worst < threshold,
         "fail_on": fo,
@@ -147,9 +165,8 @@ def read_source_span(base_dir, location, context=3):
 
 
 def worst_severity(findings):
-    """The highest severity label present in a findings list, or None."""
-    worst = max((_rank(f) for f in findings), default=0)
-    return next((k for k, v in SEV_RANK.items() if v == worst), None) if worst else None
+    """The highest severity label present, None if empty, or 'unknown' for unrecognised labels."""
+    return _label_for_rank(max((_rank(f) for f in findings), default=0))
 
 
 def merge_findings(primary, extra):

@@ -27,17 +27,34 @@ FENCE_RE = re.compile(r"```(?:json)?\s*\n(.*?)\n```", re.DOTALL)
 
 
 def extract_json_blocks(text):
-    """Return parsed JSON objects from fenced blocks, in document order (only those that parse)."""
+    """Return (span, parsed_obj, preceding_text) for each fenced JSON block that parses."""
     blocks = []
     for m in FENCE_RE.finditer(text):
         body = m.group(1).strip()
         if not body.startswith("{"):
             continue
         try:
-            blocks.append((m.span(), json.loads(body)))
+            obj = json.loads(body)
         except json.JSONDecodeError:
             continue
+        blocks.append((m.span(), obj, text[max(0, m.start() - 200):m.start()]))
     return blocks
+
+
+def select_appendix(blocks, nonce):
+    """Pick the authoritative JSON block.
+
+    With a per-run `nonce`, ONLY accept a block immediately preceded by the harness's
+    `sak:nonce:<nonce>` marker. This defeats a malicious blueprint that gets the model to echo
+    a fake JSON block — the attacker can't know the per-run nonce. Returns
+    (selected_or_None, authenticated). When no nonce is required (static-only / legacy) the
+    last block is returned and treated as authentic.
+    """
+    if nonce:
+        marker = f"sak:nonce:{nonce}"
+        authed = [b for b in blocks if marker in b[2]]
+        return (authed[-1], True) if authed else (None, False)
+    return (blocks[-1] if blocks else None), True
 
 
 def strip_json_appendix(text, span):
@@ -47,7 +64,7 @@ def strip_json_appendix(text, span):
     before = text[:start]
     after = text[end:]
     # the marker comment sits just above the block; the `---` rule sits just above that
-    before = re.sub(r"\s*<!--[^>]*?machine-readable[^>]*?-->\s*$", "\n", before, flags=re.IGNORECASE)
+    before = re.sub(r"\s*<!--[^>]*?(?:machine-readable|sak:nonce:)[^>]*?-->\s*$", "\n", before, flags=re.IGNORECASE)
     before = re.sub(r"\s*\n-{3,}[ \t]*$", "\n", before)
     cleaned = before.rstrip() + "\n"
     if after.strip():
@@ -88,6 +105,7 @@ def main():
     ap.add_argument("--generated-at", default="")
     ap.add_argument("--schema", default="", help="optional schema path for soft validation")
     ap.add_argument("--static-json", default="", help="optional JSON file of static findings to merge in")
+    ap.add_argument("--nonce", default="", help="per-run nonce; only a JSON block carrying its marker is trusted")
     args = ap.parse_args()
 
     with open(args.raw, encoding="utf-8") as fh:
@@ -102,9 +120,20 @@ def main():
             print(f"warn: could not read static findings {args.static_json}: {exc}", file=sys.stderr)
 
     blocks = extract_json_blocks(raw)
+    selected, authenticated = select_appendix(blocks, args.nonce)
+    if args.nonce and blocks and not authenticated:
+        # The model produced JSON block(s) but none carry this run's nonce marker — possible
+        # injection (a malicious blueprint getting the model to echo a fake block). Fail safe:
+        # never write report.json from an untrusted block.
+        with open(args.out_md, "w", encoding="utf-8") as fh:
+            fh.write("<!-- SECURITY: untrusted JSON appendix refused (no run nonce) -->\n" + raw)
+        print("::error::SECURITY — the JSON appendix is not nonce-authenticated; refusing it. "
+              "report.json NOT written; re-run the audit.", file=sys.stderr)
+        return 3
+
     span = None
-    if blocks:
-        span, obj = blocks[-1]
+    if selected is not None:
+        span, obj, _ = selected
         for f in obj.get("findings", []):
             f.setdefault("source", "llm")
         if static_findings:  # hybrid run — merge static into the LLM findings

@@ -15,19 +15,31 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--reports", required=True, help="a report.json file or a directory of them")
     ap.add_argument("--fail-on", default="high", help="none | critical | high | medium | low (default: high)")
+    ap.add_argument("--allow-missing", action="store_true",
+                    help="pass when no report is found (default: fail closed)")
     args = ap.parse_args()
 
+    # Fail CLOSED: a missing, unreadable, or malformed report must not pass the gate.
     files = sak_lib.find_reports(args.reports)
     if not files:
-        print(f"warn: no report.json found at {args.reports} — nothing to gate", file=sys.stderr)
-        return 0
+        if args.allow_missing:
+            print(f"warn: no report.json at {args.reports} — passing (--allow-missing)", file=sys.stderr)
+            return 0
+        print(f"::error::no report.json at {args.reports} — failing closed (use --allow-missing to opt out)",
+              file=sys.stderr)
+        return 1
 
     findings = []
     for fp in files:
         try:
-            findings.extend(sak_lib.load_report(fp).get("findings", []))
+            report = sak_lib.load_report(fp)
         except (OSError, ValueError) as exc:  # ValueError covers JSONDecodeError
-            print(f"warn: skipping unreadable {fp}: {exc}", file=sys.stderr)
+            print(f"::error::unreadable report {fp}: {exc} — failing closed", file=sys.stderr)
+            return 1
+        if not isinstance(report.get("findings"), list):
+            print(f"::error::report {fp} has no findings array — failing closed", file=sys.stderr)
+            return 1
+        findings.extend(report["findings"])
 
     try:
         verdict = sak_lib.gate_verdict({"findings": findings}, args.fail_on)

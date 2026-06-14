@@ -72,6 +72,8 @@ TARGET="$(cd "$TARGET" && pwd)"
 
 # ---- locate the kit (this script's dir) -------------------------------------
 KIT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Clean up any per-run temp files on exit (message file, composite prompt, static findings).
+trap 'rm -f "${MSG_MAIN:-}" "${COMPOSITE_PROMPT:-}" "${STATIC_FINDINGS:-}" 2>/dev/null || true' EXIT
 
 # ---- API key sourcing (skipped for --static-only) ---------------------------
 # Aider needs ANTHROPIC_API_KEY. Sources, in order: the calling shell, then
@@ -185,6 +187,24 @@ elif [[ "$NO_STATIC" == "1" ]]; then MODE_LABEL="$MODEL (no static)"
 else MODE_LABEL="$MODEL + static"; fi
 REPORT_JSON="${REPORT%.md}.json"
 
+# ---- per-run nonce: authenticates the model's JSON appendix against injection ----
+# A malicious blueprint can get the model to echo a fake JSON block; extract-report.py trusts
+# ONLY the block carrying this run's nonce marker. Built per LLM run (not for --static-only).
+NONCE=""
+MSG_MAIN=""
+if [[ "$STATIC_ONLY" != "1" ]]; then
+  NONCE="$(date +%s 2>/dev/null || echo 0)-${RANDOM}${RANDOM}-$$"
+  MSG_MAIN="$(mktemp "${TMPDIR:-/tmp}/sak-msg.XXXXXX")"
+  {
+    cat "$KIT_DIR/prompts/audit.md"
+    printf '\n## Run delimiter (required)\n\n'
+    printf 'This run'\''s machine-readable marker is exactly:\n\n'
+    printf '    <!-- sak:nonce:%s -->\n\n' "$NONCE"
+    printf 'Emit that EXACT line immediately before the §7 JSON code fence (in place of the\n'
+    printf 'generic "machine-readable" marker). Emit it once, wrapping only your real appendix.\n'
+  } > "$MSG_MAIN"
+fi
+
 # ---- collect read-only reference files --------------------------------------
 declare -a READ_FILES=()
 READ_FILES+=("$KIT_DIR/prompts/checklist.md")
@@ -263,8 +283,8 @@ elif [[ "$MODEL" == "both" ]]; then
   echo "--- pass 2/2: Claude (deep analysis) ---"
 
   # Create a composite prompt: the base audit prompt plus DeepSeek findings
-  COMPOSITE_PROMPT="$KIT_DIR/.prompt-composite-$$.md"
-  cat "$KIT_DIR/prompts/audit.md" > "$COMPOSITE_PROMPT"
+  COMPOSITE_PROMPT="$(mktemp "${TMPDIR:-/tmp}/sak-composite.XXXXXX")"
+  cat "$MSG_MAIN" > "$COMPOSITE_PROMPT"
   cat >> "$COMPOSITE_PROMPT" << PROMPT
 
 ## Pre-scan findings (DeepSeek)
@@ -321,7 +341,7 @@ else
     AIDER_MODEL="anthropic/claude-sonnet-4-6"
   fi
 
-  run_single "$AIDER_MODEL" "$KIT_DIR/prompts/audit.md" \
+  run_single "$AIDER_MODEL" "$MSG_MAIN" \
     "$REPORT.raw" "$REPORT.stderr" || {
     echo "==> aider exited non-zero — see $REPORT.stderr" >&2
     exit 1
@@ -349,7 +369,7 @@ if command -v python3 >/dev/null 2>&1; then
     --checklist-version "$CHECKLIST_VERSION" --reference-set "${#READ_FILES[@]} files" \
     --repo "$REPO" --package "$PKG" --source-hash "$SOURCE_HASH" \
     --files "${#TARGET_FILES[@]}" --generated-at "$DATE" \
-    --static-json "$STATIC_FINDINGS" \
+    --static-json "$STATIC_FINDINGS" --nonce "$NONCE" \
     --schema "$KIT_DIR/schema/audit-report.schema.json" \
     || echo "warn: report.json not produced (see above)" >&2
 else
