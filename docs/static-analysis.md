@@ -31,6 +31,9 @@ comments and string/char literals (preserving line numbers). So a rule never mat
 | `self-updatable-role` | medium | Upgrade safety | a role `updatable_by` itself |
 | `unsafe-block` | medium | Memory safety | `unsafe { … }` |
 | `panic-macro` | low | Error handling | `panic!`/`todo!`/`unimplemented!`/`unreachable!` |
+| `raw-decimal-arith` | medium | Integer / decimal arithmetic | raw `*`/`/` on a `.amount()` / `dec!()` Decimal — overflow / div-by-zero |
+| `public-mint-burn` | medium | Auth bypass | a `pub fn` named mint/burn — confirm it's role-gated |
+| `unwrap-expect` | info | Error handling | `.unwrap()` / `.expect()` — a panic surface |
 | `todo-comment` | info | Maintainability | `TODO`/`FIXME`/`XXX`/`HACK` markers |
 
 These are a starting set — high-signal footguns that are unambiguous to detect. The LLM pass

@@ -24,14 +24,16 @@ class TestFixture(unittest.TestCase):
     def setUpClass(cls):
         cls.findings = sa.analyze_package(PKG)
 
-    def test_exactly_three_findings(self):
-        self.assertEqual(len(self.findings), 3)
+    def test_finding_count(self):
+        self.assertEqual(len(self.findings), 5)
 
     def test_rules_and_locations(self):
         got = {(f["rule"], f["location"]) for f in self.findings}
         self.assertEqual(got, {
             ("self-updatable-role", "src/lib.rs:23"),
             ("owner-role-none", "src/lib.rs:72"),
+            ("raw-decimal-arith", "src/lib.rs:86"),
+            ("raw-decimal-arith", "src/lib.rs:98"),
             ("unbounded-take-all", "src/lib.rs:120"),
         })
 
@@ -44,7 +46,7 @@ class TestFixture(unittest.TestCase):
             self.assertTrue(f["suggested_direction"])
 
     def test_ids_sequential(self):
-        self.assertEqual([f["id"] for f in self.findings], ["S-001", "S-002", "S-003"])
+        self.assertEqual([f["id"] for f in self.findings], ["S-001", "S-002", "S-003", "S-004", "S-005"])
 
     def test_no_false_positives(self):
         # the fixture has enable_method_auth!, no floats/addresses/panics/unsafe
@@ -111,6 +113,32 @@ class TestStripper(unittest.TestCase):
         # &'a self must survive (no spurious char-literal swallowing the rest of the line)
         out = sa.strip_comments_and_strings("fn f<'a>(&'a self) { take_all() }")
         self.assertIn("take_all", out)
+
+
+class TestNewRules(unittest.TestCase):
+    """The high-value rules added after the adversarial pass (R4), kept high-precision."""
+
+    def test_raw_decimal_arith_on_amount(self):
+        self.assertIn("raw-decimal-arith", {r for r, _ in fired("let v = self.vault.amount() * price;")})
+
+    def test_raw_decimal_arith_on_dec_div(self):
+        self.assertIn("raw-decimal-arith", {r for r, _ in fired("let h = x / dec!(2);")})
+
+    def test_plain_addition_is_clean(self):
+        self.assertEqual(fired("fn f(a: Decimal, b: Decimal) -> Decimal { a + b }"), set())
+
+    def test_unwrap_expect_fires(self):
+        self.assertIn(("unwrap-expect", 1), fired("let x = thing.unwrap();"))
+        self.assertIn(("unwrap-expect", 1), fired('let x = thing.expect("msg");'))
+
+    def test_public_mint_burn_fires(self):
+        self.assertIn("public-mint-burn", {r for r, _ in fired("pub fn mint(&mut self) {}")})
+        self.assertIn("public-mint-burn", {r for r, _ in fired("pub fn burn_tokens(&mut self) {}")})
+
+    def test_attestation_blueprint_still_clean(self):
+        # dogfood: the kit's own L3 blueprint must stay 0-findings under the static tier
+        import static_analysis as sa
+        self.assertEqual(sa.analyze_package(os.path.join(ROOT, "attestation")), [])
 
 
 class TestEvasionsFixed(unittest.TestCase):

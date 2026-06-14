@@ -245,6 +245,40 @@ def r_missing_method_auth(ctx):
              "Add enable_method_auth! and restrict state-changing methods to the least-privileged role.")
 
 
+@rule
+def r_raw_decimal_arith(ctx):
+    # raw * and / on a Decimal amount panic on overflow (and / panics on a zero divisor).
+    # High-precision: only fire when an `.amount()` or `dec!(...)` operand sits next to the operator.
+    pat = re.compile(r"(?:\.amount\s*\(\s*\)|\bdec!\s*\([^)]*\))\s*[*/]"
+                     r"|[*/]\s*(?:[\w.]*\.amount\s*\(\s*\)|dec!\s*\()")
+    for lineno, line, _m in _matches(ctx["stripped_lines"], pat):
+        yield _f(lineno, "raw-decimal-arith", "medium", "Integer / decimal arithmetic",
+                 "raw arithmetic on a Decimal amount",
+                 f"`{line.strip()[:80]}` uses raw * or / on a Decimal amount.",
+                 "Raw Decimal * and / panic on overflow, and / panics on a zero divisor — with no precision guard.",
+                 "Use checked_mul / checked_div (handle the None) and guard divisors against zero.")
+
+
+@rule
+def r_unwrap_expect(ctx):
+    for lineno, line, m in _matches(ctx["stripped_lines"], r"\.(unwrap|expect)\s*\("):
+        yield _f(lineno, "unwrap-expect", "info", "Error handling",
+                 f"{m.group(1)}() can panic",
+                 f"`{line.strip()[:80]}` uses .{m.group(1)}().",
+                 "unwrap/expect panic on failure; on user-supplied input that's a griefing/DoS surface.",
+                 "Handle the Option/Result explicitly, or assert! with a descriptive message.")
+
+
+@rule
+def r_public_mint_burn(ctx):
+    for lineno, line, m in _matches(ctx["stripped_lines"], r"\bpub\s+fn\s+\w*(mint|burn)\w*\s*\("):
+        yield _f(lineno, "public-mint-burn", "medium", "Auth bypass",
+                 f"{m.group(1)} method — confirm it is role-gated",
+                 f"`{line.strip()[:80]}` is a public fn that {m.group(1)}s.",
+                 "An unrestricted mint/burn is unbounded supply control.",
+                 "Restrict it via enable_method_auth! to a least-privileged role; don't leave it PUBLIC.")
+
+
 # --------------------------------------------------------------------------- engine
 
 _SUPPRESS_RE = re.compile(r"//\s*sak:allow\s+([\w-]+)")

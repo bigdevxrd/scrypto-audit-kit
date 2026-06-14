@@ -29,7 +29,7 @@ Anything unchecked is fair game — open an issue to claim it.
 
 ## Phase 3 — Deterministic ✅ (v0.3)
 
-- [x] Hybrid static-analysis pass — 9 high-precision rules, a free `--static-only` tier, and the `static_scan` tool ([docs/static-analysis.md](docs/static-analysis.md))
+- [x] Hybrid static-analysis pass — 12 high-precision rules, a free `--static-only` tier, and the `static_scan` tool ([docs/static-analysis.md](docs/static-analysis.md))
 - [x] Property-test generation — compilable `#[ignore]` scrypto-test scaffolds + the `propose_tests` tool
 
 ## Phase 4 — Verifiable & connected 🚧 (v0.4)
