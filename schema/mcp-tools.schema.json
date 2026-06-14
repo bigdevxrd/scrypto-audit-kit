@@ -1,0 +1,314 @@
+{
+  "title": "scrypto-audit-kit MCP tool contracts",
+  "description": "Formal input/output contracts for the tools exposed by bin/mcp_server.py — the same functions the importable Python API exposes. Each tool descriptor mirrors the MCP tool shape (name, description, inputSchema, outputSchema); inputSchema and outputSchema are JSON Schema (draft 2020-12). Shared shapes live in $defs and are referenced with #/$defs/... — resolve them against this whole document. tests/test_tool_contracts.py keeps this file in lockstep with the live function signatures and validates real fixture output against these schemas, so the contract cannot silently drift from the code. The full report shape is audit-report.schema.json.",
+  "x_contract_format": "scrypto-audit-kit/mcp-tools/v1",
+  "x_schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+  "x_report_schema": "audit-report.schema.json",
+  "$defs": {
+    "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+    "model": {
+      "type": "string",
+      "enum": ["claude", "deepseek", "both"],
+      "description": "Analysis model: claude (Sonnet 4.6, default), deepseek (cheap broad scan), or both (cross-model)."
+    },
+    "counts": {
+      "type": "object",
+      "description": "Findings per severity label. Unknown/blank labels may appear (the gate fail-safe) and are kept verbatim.",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "finding": {
+      "type": "object",
+      "description": "One finding. Identical shape to a findings[] item in audit-report.schema.json.",
+      "additionalProperties": false,
+      "required": ["id", "severity", "class", "location", "what", "why", "suggested_direction", "confidence"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[FS]-[0-9]{3}$", "description": "F-### from the LLM pass, S-### from the static pass" },
+        "severity": { "$ref": "#/$defs/severity" },
+        "class": { "type": "string", "description": "one of the checklist class names" },
+        "location": { "type": "string", "description": "path/to/file.rs:line" },
+        "title": { "type": "string" },
+        "what": { "type": "string" },
+        "why": { "type": "string" },
+        "suggested_direction": { "type": "string", "description": "remediation direction in prose — never a code patch" },
+        "confidence": { "enum": ["high", "medium", "low"] },
+        "status": { "enum": ["open", "fixed", "wontfix", "false_positive"], "default": "open" },
+        "source": { "enum": ["llm", "static"], "description": "which engine produced this finding" },
+        "rule": { "type": "string", "description": "static rule id, when source is static" }
+      }
+    },
+    "findingsResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "counts", "findings"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "counts": { "$ref": "#/$defs/counts" },
+        "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+      }
+    },
+    "gateVerdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "fail_on", "worst", "counts", "total"],
+      "properties": {
+        "passed": { "type": "boolean", "description": "true when the worst finding is below the fail_on threshold" },
+        "fail_on": { "type": "string", "description": "the threshold applied (none|low|medium|high|critical)" },
+        "worst": {
+          "type": ["string", "null"],
+          "description": "highest severity present; null when there are no findings; 'unknown' for an unrecognised label"
+        },
+        "counts": { "$ref": "#/$defs/counts" },
+        "total": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "testSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "target", "invariant", "hint"],
+      "properties": {
+        "name": { "type": "string", "description": "generated #[test] fn name" },
+        "kind": { "enum": ["auth-negative", "happy-path", "invariant"] },
+        "target": { "type": ["string", "null"], "description": "the method under test, or null for a whole-blueprint invariant" },
+        "invariant": { "type": "string", "description": "the property the test should assert" },
+        "hint": { "type": "string", "description": "how to set it up — becomes the todo!() body" }
+      }
+    },
+    "proposeTestsResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blueprint", "count", "specs", "rust"],
+      "properties": {
+        "blueprint": { "type": "string" },
+        "count": { "type": "integer", "minimum": 0 },
+        "specs": { "type": "array", "items": { "$ref": "#/$defs/testSpec" } },
+        "rust": { "type": "string", "description": "the ready-to-save, compilable, #[ignore]d scaffold file" }
+      }
+    },
+    "attestationPayload": {
+      "type": "object",
+      "description": "The AttestationInput the registry's attest() expects. Counts are clamped to u16.",
+      "additionalProperties": false,
+      "required": ["source_hash", "report_hash", "wasm_hash", "kit_version", "checklist_version", "level", "critical", "high", "medium", "low", "info"],
+      "properties": {
+        "source_hash": { "type": "string", "description": "sha256 of the analyzed source — the deterministic anchor" },
+        "report_hash": { "type": "string", "description": "sha256 of the report.json — a fingerprint, not re-derivable for the LLM tier" },
+        "wasm_hash": { "type": "string", "description": "sha256 of the built blueprint wasm, or empty" },
+        "kit_version": { "type": "string" },
+        "checklist_version": { "type": "string" },
+        "level": { "type": "string", "description": "L1-static | L2-hybrid | ..." },
+        "critical": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "high": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "medium": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "low": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "info": { "type": "integer", "minimum": 0, "maximum": 65535 }
+      }
+    },
+    "attestationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["payload"],
+      "properties": {
+        "payload": { "$ref": "#/$defs/attestationPayload" },
+        "manifest": { "type": "string", "description": "Radix transaction manifest calling attest(); present only when component AND account were given" }
+      }
+    },
+    "sourceSpan": {
+      "type": "object",
+      "description": "The cited source (success) or an error describing why it could not be read.",
+      "additionalProperties": true,
+      "properties": {
+        "file": { "type": "string" },
+        "line": { "type": "integer" },
+        "snippet": { "type": "string", "description": "the cited line marked with > plus surrounding context" },
+        "error": { "type": "string" }
+      }
+    },
+    "showFindingSourceResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["finding", "source"],
+          "properties": {
+            "finding": { "$ref": "#/$defs/finding" },
+            "source": { "$ref": "#/$defs/sourceSpan" }
+          }
+        },
+        { "$ref": "#/$defs/errorResult" }
+      ]
+    },
+    "reauditDiffResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fixed", "still_open", "new", "summary", "report_path"],
+          "properties": {
+            "fixed": { "type": "array", "items": { "$ref": "#/$defs/finding" }, "description": "in baseline, gone now" },
+            "still_open": { "type": "array", "items": { "$ref": "#/$defs/finding" }, "description": "in both" },
+            "new": { "type": "array", "items": { "$ref": "#/$defs/finding" }, "description": "only now (watch for regressions)" },
+            "summary": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["fixed", "still_open", "new"],
+              "properties": {
+                "fixed": { "type": "integer", "minimum": 0 },
+                "still_open": { "type": "integer", "minimum": 0 },
+                "new": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "report_path": { "type": "string" }
+          }
+        },
+        { "$ref": "#/$defs/errorResult" }
+      ]
+    },
+    "auditReportResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "The pre-audit report per audit-report.schema.json, plus report_path.",
+          "required": ["findings"],
+          "properties": { "report_path": { "type": "string" } }
+        },
+        { "$ref": "#/$defs/errorResult" }
+      ]
+    },
+    "errorResult": {
+      "type": "object",
+      "description": "Returned (not raised) by the LLM-backed tools when a run produces no report.",
+      "required": ["error"],
+      "properties": {
+        "error": { "type": "string" },
+        "log": { "type": "string", "description": "tail of the harness log" }
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "audit_package",
+      "description": "Run the full pre-audit (deterministic static pass + LLM checklist pass) over a Scrypto package and return structured findings + a report_path. Needs ANTHROPIC_API_KEY and a kit clone (it shells out to audit.sh).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["package_path"],
+        "properties": {
+          "package_path": { "type": "string", "description": "package dir (has Cargo.toml + src/lib.rs)" },
+          "model": { "$ref": "#/$defs/model" },
+          "no_compile_check": { "type": "boolean", "default": false, "description": "skip the cargo wasm pre-flight" }
+        }
+      },
+      "outputSchema": { "$ref": "#/$defs/auditReportResult" }
+    },
+    {
+      "name": "static_scan",
+      "description": "Run only the deterministic static rules — free, no API key, no toolchain. The cheap first pass; reproducible.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["package_path"],
+        "properties": {
+          "package_path": { "type": "string", "description": "path to the Scrypto package (a dir with a src/ folder)" }
+        }
+      },
+      "outputSchema": { "$ref": "#/$defs/findingsResult" }
+    },
+    {
+      "name": "propose_tests",
+      "description": "Generate compilable, #[ignore]d scrypto-test property-test scaffolds for the coverage gaps (auth negative-paths, happy paths, a value-conservation invariant) — free, no API. Read-only: it returns the scaffolds, never writes them into the package.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["package_path"],
+        "properties": {
+          "package_path": { "type": "string", "description": "path to the Scrypto package (a dir with a src/ folder)" }
+        }
+      },
+      "outputSchema": { "$ref": "#/$defs/proposeTestsResult" }
+    },
+    {
+      "name": "attestation_payload",
+      "description": "Bridge a report.json to the L3 attestation registry: hashes, severity counts, level, and (with component + account) a Radix transaction manifest calling attest() — free, no API.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["report_path"],
+        "properties": {
+          "report_path": { "type": "string" },
+          "component": { "type": "string", "description": "deployed registry component address (for the manifest)" },
+          "account": { "type": "string", "description": "your account address (for the manifest)" },
+          "wasm_path": { "type": "string", "description": "optional path to the built blueprint wasm to hash" },
+          "level": { "type": "string", "description": "optional override for the derived level" }
+        }
+      },
+      "outputSchema": { "$ref": "#/$defs/attestationResult" }
+    },
+    {
+      "name": "get_findings",
+      "description": "Read findings from an existing report.json, optionally filtered by minimum severity and/or status — cheap, no API.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["report_path"],
+        "properties": {
+          "report_path": { "type": "string" },
+          "severity_min": { "type": "string", "enum": ["", "info", "low", "medium", "high", "critical"], "description": "only findings at/above this severity ('' = no filter)" },
+          "status": { "type": "string", "enum": ["", "open", "fixed", "wontfix", "false_positive"], "description": "only findings with this status ('' = any)" }
+        }
+      },
+      "outputSchema": { "$ref": "#/$defs/findingsResult" }
+    },
+    {
+      "name": "reaudit_diff",
+      "description": "Re-audit a package and diff against a baseline report — the verify step of the audit -> fix -> verify loop. Needs ANTHROPIC_API_KEY + a kit clone.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["package_path", "baseline_report_path"],
+        "properties": {
+          "package_path": { "type": "string", "description": "the package to re-audit (after fixes)" },
+          "baseline_report_path": { "type": "string", "description": "an earlier report.json to compare against" },
+          "model": { "$ref": "#/$defs/model" },
+          "no_compile_check": { "type": "boolean", "default": false }
+        }
+      },
+      "outputSchema": { "$ref": "#/$defs/reauditDiffResult" }
+    },
+    {
+      "name": "gate",
+      "description": "Apply the severity gate to a report (or a directory of reports) — pass/fail at a threshold. Fails closed on a missing/malformed report. Cheap, no API.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["report_path"],
+        "properties": {
+          "report_path": { "type": "string", "description": "a report.json or a directory of them" },
+          "fail_on": { "type": "string", "enum": ["none", "low", "medium", "high", "critical"], "default": "high", "description": "highest severity allowed before failing" }
+        }
+      },
+      "outputSchema": { "$ref": "#/$defs/gateVerdict" }
+    },
+    {
+      "name": "get_checklist",
+      "description": "Return the kit's Scrypto vulnerability checklist (the 11 classes + concrete questions per class) as markdown. Cheap, no API.",
+      "inputSchema": { "type": "object", "additionalProperties": false, "properties": {} },
+      "outputSchema": { "type": "string", "description": "the checklist markdown" }
+    },
+    {
+      "name": "show_finding_source",
+      "description": "Show the source a finding cites, with the line marked, so you can verify a citation before acting on it. Cheap, no API.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["report_path", "finding_id"],
+        "properties": {
+          "report_path": { "type": "string" },
+          "finding_id": { "type": "string", "description": "e.g. F-001" },
+          "package_path": { "type": "string", "description": "the audited package dir (locations are relative to it; defaults to cwd)" },
+          "context": { "type": "integer", "minimum": 0, "default": 3, "description": "lines of context above/below the cited line" }
+        }
+      },
+      "outputSchema": { "$ref": "#/$defs/showFindingSourceResult" }
+    }
+  ]
+}
