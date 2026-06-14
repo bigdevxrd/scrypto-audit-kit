@@ -24,24 +24,33 @@ import sak_lib
 # --------------------------------------------------------------------------- stripper
 
 
-def strip_comments_and_strings(src):
-    """Blank the contents of comments and string/char literals, preserving newlines/length.
+def strip_comments_and_strings(src, keep_strings=False, keep_comments=False):
+    """Blank the contents of comments and string/char literals, preserving every newline.
 
-    Returns source where `// ...`, `/* ... */`, "..." , r"...", and '.' are replaced by
-    spaces (newlines kept), so line/column positions of real code are unchanged.
+    Handles nested block comments (`/* /* */ */`) and string line-continuations (`"...\\`+newline).
+    - default: blank both — what code rules run over.
+    - keep_strings: preserve string/char contents (comments still blanked) — for rules that must
+      see string literals (e.g. hardcoded addresses).
+    - keep_comments: preserve comment contents (strings still blanked) — to find `// sak:allow`
+      suppressions and TODO markers without matching them inside string literals.
     """
     out = []
     i, n = 0, len(src)
     state = "code"
+    block_depth = 0
     raw_hashes = 0
+
+    def emit_comment(text):
+        out.append(text if keep_comments else " " * len(text))
+
     while i < n:
         c = src[i]
         nxt = src[i + 1] if i + 1 < n else ""
         if state == "code":
             if c == "/" and nxt == "/":
-                state = "line_comment"; out.append("  "); i += 2; continue
+                state = "line_comment"; emit_comment("//"); i += 2; continue
             if c == "/" and nxt == "*":
-                state = "block_comment"; out.append("  "); i += 2; continue
+                state = "block_comment"; block_depth = 1; emit_comment("/*"); i += 2; continue
             if c == '"':
                 state = "string"; out.append('"'); i += 1; continue
             if c == "r" and (nxt == '"' or nxt == "#"):
@@ -63,29 +72,43 @@ def strip_comments_and_strings(src):
             if c == "\n":
                 state = "code"; out.append("\n")
             else:
-                out.append("\t" if c == "\t" else " ")
+                emit_comment(c)
             i += 1; continue
         if state == "block_comment":
+            if c == "/" and nxt == "*":
+                block_depth += 1; emit_comment("/*"); i += 2; continue
             if c == "*" and nxt == "/":
-                state = "code"; out.append("  "); i += 2; continue
-            out.append("\n" if c == "\n" else ("\t" if c == "\t" else " ")); i += 1; continue
-        if state == "string":
+                block_depth -= 1; emit_comment("*/"); i += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            out.append(c if keep_comments else ("\n" if c == "\n" else "\t" if c == "\t" else " "))
+            i += 1; continue
+        if state in ("string", "char"):
+            closer = '"' if state == "string" else "'"
             if c == "\\":
-                out.append("  "); i += 2; continue
-            if c == '"':
-                state = "code"; out.append('"'); i += 1; continue
-            out.append("\n" if c == "\n" else " "); i += 1; continue
-        if state == "char":
-            if c == "\\":
-                out.append("  "); i += 2; continue
-            if c == "'":
-                state = "code"; out.append("'"); i += 1; continue
-            out.append(" "); i += 1; continue
+                if keep_strings:
+                    out.append(c); out.append(nxt)
+                elif nxt == "\n":        # line-continuation: keep the newline so line numbers hold
+                    out.append(" \n")
+                else:
+                    out.append("  ")
+                i += 2; continue
+            if c == closer:
+                state = "code"; out.append(closer); i += 1; continue
+            out.append(c if keep_strings else ("\n" if c == "\n" else " "))
+            i += 1; continue
         if state == "raw_string":
             if c == '"' and src[i + 1:i + 1 + raw_hashes] == "#" * raw_hashes:
                 state = "code"; out.append('"' + "#" * raw_hashes); i += 1 + raw_hashes; continue
-            out.append("\n" if c == "\n" else " "); i += 1; continue
+            out.append(c if keep_strings else ("\n" if c == "\n" else " "))
+            i += 1; continue
     return "".join(out)
+
+
+def _line_of(text, offset):
+    """1-indexed line number of a character offset in text."""
+    return text.count("\n", 0, offset) + 1
 
 
 # --------------------------------------------------------------------------- rules
@@ -126,10 +149,10 @@ def r_float_usage(ctx):
 
 @rule
 def r_hardcoded_address(ctx):
-    # addresses live in string literals, so scan the RAW source
-    pat = re.compile(r"\b(resource|component|package|account|validator|consensusmanager)_"
-                     r"(rdx|tdx|sim)1[02-9ac-hj-np-z]{20,}")
-    for lineno, line, m in _matches(ctx["raw_lines"], pat):
+    # addresses live in string literals → scan with strings kept, comments blanked (no FP in docs).
+    # Generic `<entity>_rdx1…` shape covers pool/accountlocker/identity/internal_*/etc., not just a few.
+    pat = re.compile(r"\b[a-z_]{3,}_(?:rdx|tdx|sim)1[02-9ac-hj-np-z]{20,}")
+    for lineno, line, m in _matches(ctx["code_with_strings_lines"], pat):
         yield _f(lineno, "hardcoded-address", "medium", "External calls / composability",
                  "hardcoded on-ledger address",
                  f"hardcoded `{m.group(0)[:24]}…` in source.",
@@ -139,7 +162,7 @@ def r_hardcoded_address(ctx):
 
 @rule
 def r_unbounded_take_all(ctx):
-    for lineno, line, _m in _matches(ctx["stripped_lines"], r"\.take_all\s*\(\s*\)"):
+    for lineno, line, _m in _matches(ctx["stripped_lines"], r"\.take_all\s*\("):
         yield _f(lineno, "unbounded-take-all", "medium", "Resource handling",
                  "unbounded vault drain via take_all()",
                  f"`{line.strip()[:80]}` empties the whole vault in one call.",
@@ -149,10 +172,11 @@ def r_unbounded_take_all(ctx):
 
 @rule
 def r_owner_role_none(ctx):
-    for lineno, line, _m in _matches(ctx["stripped_lines"], r"prepare_to_globalize\s*\(\s*OwnerRole::None"):
-        yield _f(lineno, "owner-role-none", "medium", "Upgrade safety",
+    # whole-text so rustfmt line-wrapping (OwnerRole::None on its own line) can't evade it
+    for m in re.finditer(r"prepare_to_globalize\s*\(\s*OwnerRole::None", ctx["stripped"]):
+        yield _f(_line_of(ctx["stripped"], m.start()), "owner-role-none", "medium", "Upgrade safety",
                  "component globalized with no owner",
-                 f"`{line.strip()[:80]}` globalizes with OwnerRole::None.",
+                 "`prepare_to_globalize(OwnerRole::None)` globalizes with no owner.",
                  "With no owner there is no authority to rotate roles, pause, or recover if a managing badge is lost or compromised.",
                  "Globalize with an explicit OwnerRole governing the admin role(s).")
 
@@ -195,7 +219,7 @@ def r_panic_macro(ctx):
 @rule
 def r_todo_comment(ctx):
     pat = re.compile(r"//.*\b(TODO|FIXME|XXX|HACK)\b")
-    for lineno, line, m in _matches(ctx["raw_lines"], pat):
+    for lineno, line, m in _matches(ctx["comments_lines"], pat):
         yield _f(lineno, "todo-comment", "info", "Maintainability",
                  f"{m.group(1)} marker",
                  f"unresolved `{m.group(1)}` at this line.",
@@ -203,15 +227,18 @@ def r_todo_comment(ctx):
                  "Resolve it or convert it into a tracked issue before audit.")
 
 
+_BLUEPRINT_RE = re.compile(r"#\[\s*(?:\w+::)*blueprint\s*\]")  # also matches #[scrypto::blueprint]
+
+
 @rule
 def r_missing_method_auth(ctx):
     s = ctx["stripped"]
-    if "#[blueprint]" not in s or "enable_method_auth!" in s:
+    match = _BLUEPRINT_RE.search(s)
+    if not match or "enable_method_auth!" in s:
         return
     if not re.search(r"\bpub\s+fn\b", s):
         return
-    line = next((i for i, ln in enumerate(ctx["stripped_lines"], 1) if "#[blueprint]" in ln), 1)
-    yield _f(line, "missing-method-auth", "high", "Auth bypass",
+    yield _f(_line_of(s, match.start()), "missing-method-auth", "high", "Auth bypass",
              "blueprint has no enable_method_auth!",
              "a #[blueprint] with public methods declares no enable_method_auth! macro.",
              "Without it every public method is callable by anyone — there is no role gating at all.",
@@ -223,11 +250,12 @@ def r_missing_method_auth(ctx):
 _SUPPRESS_RE = re.compile(r"//\s*sak:allow\s+([\w-]+)")
 
 
-def _suppressed(raw_lines, line, rule_id):
-    """True if `// sak:allow <rule>` is on this line or the line above (1-indexed)."""
+def _suppressed(comment_lines, line, rule_id):
+    """True if `// sak:allow <rule>` is on this line or the line above (1-indexed). Operates on the
+    comments-visible view, so a suppression token inside a string literal does not suppress."""
     for candidate in (line, line - 1):
-        if 1 <= candidate <= len(raw_lines):
-            m = _SUPPRESS_RE.search(raw_lines[candidate - 1])
+        if 1 <= candidate <= len(comment_lines):
+            m = _SUPPRESS_RE.search(comment_lines[candidate - 1])
             if m and m.group(1) in (rule_id, "all"):
                 return True
     return False
@@ -235,19 +263,20 @@ def _suppressed(raw_lines, line, rule_id):
 
 def analyze_text(rel_path, src):
     """Run all rules over one file's source. Returns raw findings (no ids yet)."""
-    raw_lines = src.splitlines()
     stripped = strip_comments_and_strings(src)
     ctx = {
         "rel_path": rel_path,
         "raw": src,
-        "raw_lines": raw_lines,
+        "raw_lines": src.splitlines(),
         "stripped": stripped,
         "stripped_lines": stripped.splitlines(),
+        "comments_lines": strip_comments_and_strings(src, keep_comments=True).splitlines(),
+        "code_with_strings_lines": strip_comments_and_strings(src, keep_strings=True).splitlines(),
     }
     found = []
     for fn in RULES:
         for item in fn(ctx):
-            if _suppressed(raw_lines, item["line"], item["rule"]):
+            if _suppressed(ctx["comments_lines"], item["line"], item["rule"]):
                 continue
             item["rel_path"] = rel_path
             found.append(item)

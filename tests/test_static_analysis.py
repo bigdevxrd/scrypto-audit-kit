@@ -113,5 +113,40 @@ class TestStripper(unittest.TestCase):
         self.assertIn("take_all", out)
 
 
+class TestEvasionsFixed(unittest.TestCase):
+    """Regression tests for the evasions/bugs the adversarial pass found (R3)."""
+
+    def test_string_continuation_preserves_line_numbers(self):
+        # "x\<newline>y" is one string spanning two lines; take_all must report on line 3
+        src = 'let s = "x\\\ny";\nself.vault.take_all();'
+        self.assertIn(("unbounded-take-all", 3), fired(src))
+
+    def test_nested_block_comment_no_leak(self):
+        self.assertEqual(fired("/* a /* b */ self.vault.take_all(); */\nfn f(){}"), set())
+
+    def test_suppression_inside_string_does_not_suppress(self):
+        src = 'let doc = "// sak:allow unbounded-take-all";\nself.vault.take_all();'
+        self.assertIn(("unbounded-take-all", 2), fired(src))
+
+    def test_qualified_blueprint_path_caught(self):
+        bp = "#[scrypto::blueprint]\nmod m {\n  impl X { pub fn f(&mut self) {} }\n}"
+        self.assertIn("missing-method-auth", {r for r, _ in fired(bp)})
+
+    def test_ownerrole_none_multiline_caught(self):
+        # rustfmt puts the arg on its own line — must not evade
+        self.assertIn("owner-role-none",
+                      {r for r, _ in fired("let g = b.prepare_to_globalize(\n    OwnerRole::None,\n);")})
+
+    def test_take_all_multiline_caught(self):
+        self.assertIn("unbounded-take-all", {r for r, _ in fired("self.vault.take_all(\n)")})
+
+    def test_hardcoded_address_broadened(self):
+        addr = "pool_rdx1qcdefghjkmnpqrstuvwxyz23456789"
+        self.assertIn("hardcoded-address", {r for r, _ in fired(f'let a = "{addr}";')})
+
+    def test_hardcoded_address_not_in_comment(self):
+        self.assertEqual(fired("// see pool_rdx1qcdefghjkmnpqrstuvwxyz23456789"), set())
+
+
 if __name__ == "__main__":
     unittest.main()
