@@ -147,6 +147,10 @@ case "$PARENT" in
     ;;
 esac
 DATE="$(date +%Y-%m-%d)"
+# Sanitise the derived names before they become a filename (a hostile package dir name never
+# reaches a shell — it's passed as argv — but keep report filenames to a safe character set).
+REPO="$(printf '%s' "$REPO" | tr -c 'A-Za-z0-9._-' '_')"
+PKG="$(printf '%s' "$PKG" | tr -c 'A-Za-z0-9._-' '_')"
 REPORT="$KIT_DIR/audit-reports/${REPO}-${PKG}-${DATE}.md"
 mkdir -p "$KIT_DIR/audit-reports"
 
@@ -271,11 +275,12 @@ elif [[ "$MODEL" == "both" ]]; then
 
   # Extract findings section from DeepSeek output to use as context for Claude
   FINDINGS_ONLY="$REPORT.deepseek-findings"
-  awk '/^### [0-9]\. Findings|^## [0-9]\. Findings|^## Findings/,/^## /' \
-    "$DEEPSEEK_REPORT" 2>/dev/null | head -200 > "$FINDINGS_ONLY" || true
+  # From the first "Findings" heading to the end, capped — and neutralise ``` fences so DeepSeek
+  # output (which may echo attacker source) can't break out of the wrapper fed to Claude below.
+  awk 'tolower($0) ~ /findings/ {f=1} f' "$DEEPSEEK_REPORT" 2>/dev/null \
+    | head -200 | sed 's/```/~~~/g' > "$FINDINGS_ONLY" || true
   if [[ ! -s "$FINDINGS_ONLY" ]]; then
-    # Fallback: last 200 lines if we can't find the section
-    tail -200 "$DEEPSEEK_REPORT" > "$FINDINGS_ONLY"
+    tail -200 "$DEEPSEEK_REPORT" 2>/dev/null | sed 's/```/~~~/g' > "$FINDINGS_ONLY" || true
   fi
 
   # Pass 2: Claude — deep analysis with DeepSeek findings as context

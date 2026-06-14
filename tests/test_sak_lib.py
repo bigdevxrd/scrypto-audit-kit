@@ -67,6 +67,18 @@ class TestSakLib(unittest.TestCase):
         self.assertTrue(any(f["id"] == "F-099" for f in diff["new"]))
         self.assertEqual(len(diff["still_open"]), 7)
 
+    def test_merge_keeps_distinct_severities(self):
+        # an info finding must not collide with / hide a critical sharing class+title
+        primary = [{"class": "X", "title": "t", "severity": "info"}]
+        extra = [{"class": "X", "title": "t", "severity": "critical"}]
+        merged = sak_lib.merge_findings(primary, extra)
+        self.assertEqual(sorted(f["severity"] for f in merged), ["critical", "info"])
+
+    def test_merge_dedups_true_duplicates(self):
+        a = [{"class": "X", "title": "t", "severity": "high"}]
+        b = [{"class": "X", "title": "t", "severity": "high"}]
+        self.assertEqual(len(sak_lib.merge_findings(a, b)), 1)
+
     def test_read_source_span_marks_cited_line(self):
         span = sak_lib.read_source_span(PKG, "src/lib.rs:87", context=2)
         self.assertEqual(span["line"], 87)

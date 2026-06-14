@@ -22,13 +22,20 @@ def _sha256_file(path):
     return h.hexdigest()
 
 
+def _u16(n):
+    """Clamp a count to the u16 the on-chain field accepts (so >65535 findings can't break it)."""
+    try:
+        return max(0, min(int(n), 65535))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _derive_level(report):
-    """L1-static if there's no LLM pass, else L2-hybrid."""
-    if "static-only" in str(report.get("kit", {}).get("model", "")).lower():
-        return "L1-static"
-    if any(str(f.get("source", "")).lower() == "llm" for f in report.get("findings", [])):
-        return "L2-hybrid"
-    return "L1-static"
+    """L1-static when only the static tier ran, else L2-hybrid. Derived from the harness-stamped
+    model (authoritative), not from whether findings happen to be tagged — so a clean full run
+    (0 findings) is still L2, not a spurious downgrade."""
+    model = str(report.get("kit", {}).get("model", "")).lower()
+    return "L1-static" if "static-only" in model else "L2-hybrid"
 
 
 def build_payload(report_path, wasm_path="", level=""):
@@ -43,11 +50,11 @@ def build_payload(report_path, wasm_path="", level=""):
         "kit_version": kit.get("version", "unknown"),
         "checklist_version": kit.get("checklist_version", "unknown"),
         "level": level or _derive_level(report),
-        "critical": counts.get("critical", 0),
-        "high": counts.get("high", 0),
-        "medium": counts.get("medium", 0),
-        "low": counts.get("low", 0),
-        "info": counts.get("info", 0),
+        "critical": _u16(counts.get("critical", 0)),
+        "high": _u16(counts.get("high", 0)),
+        "medium": _u16(counts.get("medium", 0)),
+        "low": _u16(counts.get("low", 0)),
+        "info": _u16(counts.get("info", 0)),
     }
 
 
@@ -58,7 +65,9 @@ _U16_FIELDS = ["critical", "high", "medium", "low", "info"]
 def render_manifest(payload, component, account, fee="10"):
     """Render a Radix transaction manifest calling attest(AttestationInput) + depositing the NFT."""
     def quote(v):
-        return '"' + str(v).replace("\\", "\\\\").replace('"', '\\"') + '"'
+        s = str(v).replace("\\", "\\\\").replace('"', '\\"')
+        s = s.replace("\n", " ").replace("\r", " ")  # no control chars in a manifest string literal
+        return '"' + s + '"'
 
     rows = [f"        {quote(payload[k])}," for k in _STR_FIELDS]
     rows += [f"        {int(payload[k])}u16," for k in _U16_FIELDS]

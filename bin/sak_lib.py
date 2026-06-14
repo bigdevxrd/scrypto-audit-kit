@@ -112,13 +112,15 @@ def gate_verdict(report, fail_on="high"):
 def finding_signature(finding):
     """A stable-ish identity for a finding across runs.
 
-    Keyed on (class, title), NOT the F-### id (ids are assigned per-run by severity
-    order) and NOT location (line numbers shift when code is edited). Heuristic —
-    callers should confirm with show_finding_source when it matters.
+    Keyed on (class, title, severity) — NOT the F-### id (assigned per-run) and NOT location
+    (line numbers shift when code is edited). Severity is included so a low-severity finding can
+    never collide with — and silently hide — a higher-severity one sharing a class/title.
+    Heuristic; confirm with show_finding_source when it matters.
     """
-    return "{}::{}".format(
+    return "{}::{}::{}".format(
         str(finding.get("class", "")).strip().lower(),
         str(finding.get("title", "")).strip().lower(),
+        _norm_severity(finding),
     )
 
 

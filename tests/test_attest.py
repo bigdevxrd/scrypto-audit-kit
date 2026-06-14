@@ -57,6 +57,21 @@ class TestAttest(unittest.TestCase):
         self.assertIn("2u16", m)                   # critical
         self.assertIn('"L2-hybrid"', m)
 
+    def test_derive_level_from_model(self):
+        self.assertEqual(attest._derive_level({"kit": {"model": "static-only"}}), "L1-static")
+        # a clean full run (0 findings) must still be L2, not a downgrade
+        self.assertEqual(attest._derive_level({"kit": {"model": "anthropic/claude-sonnet-4-6"},
+                                               "findings": []}), "L2-hybrid")
+
+    def test_u16_clamp(self):
+        self.assertEqual(attest._u16(70000), 65535)
+        self.assertEqual(attest._u16(-5), 0)
+        self.assertEqual(attest._u16("x"), 0)
+
+    def test_manifest_strips_control_chars(self):
+        payload = dict(self.payload, level="L2\nCALL_METHOD evil")
+        self.assertNotIn("\nCALL_METHOD evil", attest.render_manifest(payload, "c", "a"))
+
 
 if __name__ == "__main__":
     unittest.main()
