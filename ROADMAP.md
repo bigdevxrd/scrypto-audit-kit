@@ -19,12 +19,13 @@ Anything unchecked is fair game — open an issue to claim it.
 - [ ] First trial reports against public blueprints *(help wanted)*
 - [ ] Direct-API structured-output mode (guaranteed-valid JSON, no markdown parse)
 
-## Phase 2 — Agentic
+## Phase 2 — Agentic ✅ (v0.2)
 
-- [ ] MCP server (`audit_package`, `get_findings`, `verify_finding`, `reaudit_diff`)
-- [ ] Claude Code skill / plugin
-- [ ] `AGENTS.md` convention so any agent can self-serve the kit
-- [ ] audit → fix → re-verify loop (read-only auditor + supervised fixer)
+- [x] MCP server — `audit_package`, `get_findings`, `reaudit_diff`, `gate`, `get_checklist`, `show_finding_source`
+- [x] Claude Code skill (`scrypto-pre-audit`) + `.mcp.json`
+- [x] `AGENTS.md` convention so any agent can self-serve the kit
+- [x] audit → fix → re-verify loop (read-only auditor + supervised fixer)
+- [ ] Real-world shakedown — drive the loop on a live blueprint end-to-end *(needs an API key)*
 
 ## Phase 3 — Deterministic
 

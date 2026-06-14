@@ -137,33 +137,41 @@ jobs:
 
 It compiles, audits, uploads the report, and fails on High/Critical findings — an honest "pre-audit passing" signal, not a safety guarantee.
 
+### Use it from an agent (MCP + Claude Code)
+
+The kit ships an **MCP server** so an agent can run the pre-audit as tools and walk you through **audit → fix → re-verify**:
+
+```bash
+pip install "mcp[cli]"
+claude mcp add --transport stdio scrypto-audit-kit -- python3 "$PWD/bin/mcp_server.py"
+```
+
+Tools: `audit_package`, `get_findings`, `show_finding_source`, `reaudit_diff`, `gate`, `get_checklist`. There's also a Claude Code skill (`/scrypto-pre-audit`) and an [AGENTS.md](AGENTS.md) playbook for any agent. Full setup — including the audit→fix→verify loop — in [docs/agents.md](docs/agents.md).
+
 ## What's in the kit
 
 ```
 scrypto-audit-kit/
-├── audit.sh              The harness — wraps aider with the right flags + context.
-├── Makefile              Convenience targets (audit, lint, check-deps).
-├── VERSION               Kit version, stamped into every report.
-├── VISION.md             The trust-ladder strategy + roadmap.
-├── .aider.conf.yml       Tuned config: model=Sonnet 4.6, no editor, no commits, prompt cache on.
-├── .aiderignore          Aider no-fly zones (build artifacts, secrets, prior reports).
+├── audit.sh                The harness — wraps aider with the right flags + context.
+├── Makefile                Convenience targets (audit, lint, test, check-deps).
+├── VERSION                 Kit version, stamped into every report.
+├── VISION.md / ROADMAP.md  The trust-ladder strategy + the live phase checklist.
+├── AGENTS.md               How an agent should drive the kit (audit → fix → verify).
+├── .mcp.json               MCP server config (auto-wires the tools in Claude Code).
+├── .aider.conf.yml         Tuned config: model=Sonnet 4.6, no editor/commits, cache on.
 ├── prompts/
-│   ├── audit.md          Auditor-role prompt + report structure (incl. the JSON appendix).
-│   └── checklist.md      Eleven vulnerability classes with concrete questions per class.
-├── references/           Read-only context — production patterns + threat models.
-│   ├── README.md         Curator notes and update procedure.
-│   ├── ignition-patterns.md
-│   ├── caviarnine-hyperstake-patterns.md
-│   ├── subintents-patterns.md
-│   ├── strategy-vault-threat-model.md
-│   └── radix-scrypto-knowledge.md
-├── schema/               JSON Schema for the machine-readable report.
-├── bin/                  extract-report.py (md→json split) + ci-gate.py (severity gate).
-├── docs/                 ci.md — wiring the pre-audit into CI + the badge.
-├── audit-reports/        Output dir, gitignored.
+│   ├── audit.md            Auditor-role prompt + report structure (incl. the JSON appendix).
+│   └── checklist.md        Eleven vulnerability classes with concrete questions per class.
+├── references/             Read-only context — production patterns + threat models (5 files).
+├── schema/                 JSON Schema for the machine-readable report.
+├── bin/                    sak_lib.py (shared logic) · mcp_server.py · extract-report.py · ci-gate.py
+├── tests/                  Stdlib unit tests for the tooling (`make test`).
+├── docs/                   ci.md (CI + badge) · agents.md (MCP + the fix loop).
+├── .claude/skills/         The scrypto-pre-audit Claude Code skill.
+├── audit-reports/          Output dir, gitignored.
 └── examples/
-    ├── vulnerable-vault/ Deliberately-vulnerable fixture + its committed report.
-    └── ci/               Drop-in pre-audit workflow for your repo.
+    ├── vulnerable-vault/   Deliberately-vulnerable fixture + its committed report.
+    └── ci/                 Drop-in pre-audit workflow for your repo.
 ```
 
 ## Limitations — read this before relying on the output
