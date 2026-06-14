@@ -24,11 +24,13 @@ class TestAttest(unittest.TestCase):
         self.assertEqual((p["critical"], p["high"], p["medium"], p["low"], p["info"]), (2, 2, 3, 1, 0))
 
     def test_source_hash_from_report(self):
-        report = json.load(open(SAMPLE, encoding="utf-8"))
+        with open(SAMPLE, encoding="utf-8") as fh:
+            report = json.load(fh)
         self.assertEqual(self.payload["source_hash"], report["target"]["source_hash"])
 
     def test_report_hash_is_sha256_of_file(self):
-        expected = hashlib.sha256(open(SAMPLE, "rb").read()).hexdigest()
+        with open(SAMPLE, "rb") as fh:
+            expected = hashlib.sha256(fh.read()).hexdigest()
         self.assertEqual(self.payload["report_hash"], expected)
         self.assertEqual(len(self.payload["report_hash"]), 64)
 

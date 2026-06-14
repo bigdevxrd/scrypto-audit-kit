@@ -28,3 +28,10 @@ target/
 # Python artifacts
 __pycache__/
 *.pyc
+
+# Python packaging build artifacts (pip install / build leaves these in-tree)
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/

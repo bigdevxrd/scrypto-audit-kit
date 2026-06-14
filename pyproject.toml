@@ -1,0 +1,65 @@
+# scrypto-audit-kit — packaging for the deterministic Python core + the MCP server.
+#
+# The kit is designed to run from a bare `git clone` with NO install: ./audit.sh, the
+# bin/ scripts, and the test suite all work that way and this file changes none of it.
+# What it ADDS is a pip-installable layer so agent developers can
+#
+#     pip install scrypto-audit-kit
+#     from scrypto_audit_kit import static_analysis, sak_lib, attest, gen_tests
+#
+# plus console entry points (sak-static, sak-gate, ...). The full LLM audit (audit.sh)
+# still needs a kit clone + aider; the pip package is the deterministic, no-API-key core
+# and the MCP server. See docs/sdk.md.
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scrypto-audit-kit"
+dynamic = ["version"]
+description = "Pre-audit toolkit for Scrypto blueprints on Radix: deterministic static analysis, an LLM checklist pass, machine-readable reports, an MCP server, and on-chain attestation."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "Apache-2.0" }
+authors = [{ name = "bigdev" }]
+keywords = ["scrypto", "radix", "smart-contracts", "security", "audit", "static-analysis", "mcp", "defi", "web3"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Security",
+  "Topic :: Software Development :: Quality Assurance",
+]
+# The deterministic core is stdlib-only by design — zero required dependencies.
+dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp[cli]>=1.0"]          # the MCP server (sak-mcp)
+schema = ["jsonschema>=4.0"]     # opt-in report/contract schema validation
+dev = ["jsonschema>=4.0", "mcp[cli]>=1.0"]
+
+[project.urls]
+Homepage = "https://github.com/bigdevxrd/scrypto-audit-kit"
+Repository = "https://github.com/bigdevxrd/scrypto-audit-kit"
+Issues = "https://github.com/bigdevxrd/scrypto-audit-kit/issues"
+Documentation = "https://github.com/bigdevxrd/scrypto-audit-kit/tree/main/docs"
+
+# Console entry points map to the un-hyphenated, importable modules' main().
+[project.scripts]
+sak-static = "scrypto_audit_kit.static_analysis:main"
+sak-gen-tests = "scrypto_audit_kit.gen_tests:main"
+sak-attest = "scrypto_audit_kit.attest:main"
+sak-gate = "scrypto_audit_kit.ci_gate:main"
+sak-mcp = "scrypto_audit_kit.mcp_server:main"
+
+# The existing bin/ directory IS the package — no files move, so the bare-clone run
+# paths (audit.sh, the tests, .mcp.json) are untouched.
+[tool.setuptools]
+package-dir = { "scrypto_audit_kit" = "bin" }
+packages = ["scrypto_audit_kit"]
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }

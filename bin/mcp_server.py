@@ -22,7 +22,30 @@ import gen_tests
 import sak_lib
 import static_analysis
 
-KIT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def _kit_home():
+    """Locate the kit's repo resources (audit.sh, prompts/, schema/).
+
+    Order: $SAK_HOME, then walk up from this file looking for audit.sh (the bare-clone
+    case — bin/ sits one level below the kit root), then the repo-layout default. This lets
+    a pip-installed server find a kit clone via SAK_HOME while keeping clone behaviour
+    byte-identical to the previous dirname(dirname(__file__)).
+    """
+    env = os.environ.get("SAK_HOME")
+    if env and os.path.isfile(os.path.join(env, "audit.sh")):
+        return env
+    here = os.path.dirname(os.path.abspath(__file__))
+    walk = here
+    for _ in range(4):
+        if os.path.isfile(os.path.join(walk, "audit.sh")):
+            return walk
+        parent = os.path.dirname(walk)
+        if parent == walk:
+            break
+        walk = parent
+    return os.path.dirname(here)  # default: bin/ -> kit root
+
+
+KIT_DIR = _kit_home()
 AUDIT_SH = os.path.join(KIT_DIR, "audit.sh")
 REPORTS_DIR = os.path.join(KIT_DIR, "audit-reports")
 CHECKLIST = os.path.join(KIT_DIR, "prompts", "checklist.md")
@@ -123,6 +146,10 @@ def gate(report_path: str, fail_on: str = "high") -> dict:
 
 def get_checklist() -> str:
     """Return the kit's Scrypto vulnerability checklist (the 11 classes + questions)."""
+    if not os.path.isfile(CHECKLIST):
+        raise RuntimeError(
+            f"checklist not found at {CHECKLIST} — run the server from a scrypto-audit-kit "
+            "clone, or set SAK_HOME to point at one")
     with open(CHECKLIST, encoding="utf-8") as fh:
         return fh.read()
 
