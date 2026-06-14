@@ -1,0 +1,23 @@
+# Compile-check the attestation reference blueprint. Runs only when it changes, so it
+# doesn't tax the common (Python/bash) path. Host target — the wasm32 build needs Linux
+# toolchain setup and isn't required just to catch type errors.
+name: blueprint
+
+on:
+  push:
+    branches: [main]
+    paths: ['attestation/**']
+  pull_request:
+    paths: ['attestation/**']
+
+jobs:
+  cargo-check:
+    name: cargo check (attestation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: attestation
+      - run: cargo check --manifest-path attestation/Cargo.toml

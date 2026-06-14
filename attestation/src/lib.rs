@@ -9,8 +9,9 @@
 //! who minted. A trusted `issuer` (the OWNER) can additionally endorse an attestation. The minted
 //! NFT is soulbound (non-transferable once held).
 //!
-//! ⚠️ REFERENCE IMPLEMENTATION. Build, test, and — eat our own dogfood — pre-audit (run the kit on
-//! it) and human-audit this on Linux before any mainnet deployment. It has not been compiled in CI.
+//! ⚠️ REFERENCE IMPLEMENTATION. It type-checks (`cargo check`) and is compile-checked in CI, but it
+//! has not been deployed or human-audited. Build, test, pre-audit (run the kit on it), and human-audit
+//! before any mainnet use. The wasm32 build needs Linux (Mac's bulk-memory / blst issue).
 
 use scrypto::prelude::*;
 
@@ -76,8 +77,9 @@ mod attestation_registry {
 
     struct AttestationRegistry {
         /// The soulbound attestation NFT (non-withdrawable once held).
-        attestations: ResourceManager,
-        /// source_hash -> latest attestation id, for quick on-ledger lookup.
+        attestations: NonFungibleResourceManager,
+        /// source_hash -> latest ISSUER-VERIFIED attestation id. Self-attestations are NOT
+        /// indexed, so a permissionless caller cannot grief this lookup.
         index: KeyValueStore<String, NonFungibleLocalId>,
         count: u64,
     }
@@ -130,7 +132,7 @@ mod attestation_registry {
             })
             .globalize();
 
-            (component, owner_badge)
+            (component, owner_badge.into())
         }
 
         /// Record an attestation and mint its soulbound NFT (deposit it to keep the receipt).
@@ -157,7 +159,6 @@ mod attestation_registry {
             };
 
             let nft = self.attestations.mint_non_fungible(&id, data);
-            self.index.insert(input.source_hash.clone(), id);
 
             Runtime::emit_event(AttestationCreated {
                 attestation_id: self.count,
@@ -168,24 +169,34 @@ mod attestation_registry {
                 high: input.high,
             });
 
-            nft
+            // The NFT is the record; self-attestations are queryable via the event / Gateway but
+            // are intentionally NOT indexed — only mark_verified indexes (see below).
+            nft.into()
         }
 
-        /// The latest attestation id recorded for a source hash, if any.
+        /// The latest ISSUER-VERIFIED attestation id for a source hash, if any. Self-attestations
+        /// are not indexed — query those via the AttestationCreated event / Gateway.
         pub fn latest_attestation(&self, source_hash: String) -> Option<NonFungibleLocalId> {
             self.index.get(&source_hash).map(|id| id.clone())
         }
 
-        /// Whether any attestation exists for a source hash.
+        /// Whether an ISSUER-VERIFIED attestation exists for a source hash.
         pub fn is_attested(&self, source_hash: String) -> bool {
             self.index.get(&source_hash).is_some()
         }
 
-        /// Endorse an attestation as issuer-verified (a higher trust tier than self-attestation).
+        /// Endorse an attestation as issuer-verified (a higher trust tier than self-attestation),
+        /// and index it so latest_attestation / is_attested reflect only endorsed records.
         pub fn mark_verified(&mut self, attestation_id: u64) {
+            assert!(
+                attestation_id >= 1 && attestation_id <= self.count,
+                "no such attestation"
+            );
             let id = NonFungibleLocalId::integer(attestation_id);
             self.attestations
                 .update_non_fungible_data(&id, "issuer_verified", true);
+            let data: AttestationData = self.attestations.get_non_fungible_data(&id);
+            self.index.insert(data.source_hash, id);
         }
     }
 }
