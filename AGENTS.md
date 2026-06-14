@@ -12,8 +12,9 @@ report what was checked and what's residual.
 ## Using the kit to audit a package
 
 **Via the MCP server** (preferred — see [docs/agents.md](docs/agents.md) to connect it):
-the `scrypto-audit-kit` server exposes `static_scan` (free, no API),
-`audit_package`, `get_findings`, `show_finding_source`, `reaudit_diff`, `gate`, and `get_checklist`.
+the `scrypto-audit-kit` server exposes `static_scan` (free, no API), `audit_package`,
+`propose_tests`, `attestation_payload`, `get_findings`, `show_finding_source`, `reaudit_diff`,
+`gate`, and `get_checklist`.
 
 **Via the CLI:**
 

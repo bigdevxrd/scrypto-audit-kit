@@ -30,7 +30,7 @@ jobs:
       - name: Lint markdown
         # Ruleset lives in .markdownlint.json (auto-discovered). References bend
         # strict markdown rules for code samples — see that file for what's relaxed.
-        run: markdownlint README.md CONTRIBUTING.md CODE_OF_CONDUCT.md AGENTS.md VISION.md ROADMAP.md docs/ prompts/ references/ examples/
+        run: markdownlint README.md CONTRIBUTING.md CODE_OF_CONDUCT.md AGENTS.md VISION.md ROADMAP.md docs/ prompts/ references/ examples/ attestation/
 
   tests:
     name: unit tests

@@ -10,6 +10,8 @@ L1 of the [trust ladder](../VISION.md).
 |------|--------------|
 | `static_scan(package_path)` | **Free, no API** — deterministic rules only. The cheap first pass. |
 | `audit_package(package_path, model?, no_compile_check?)` | Run the full pre-audit (static + LLM); returns structured findings + `report_path`. |
+| `propose_tests(package_path)` | **Free** — compilable scrypto-test scaffolds for the coverage gaps. |
+| `attestation_payload(report_path, component?, account?)` | **Free** — turn a report into an on-chain attestation payload + a Radix manifest. |
 | `get_findings(report_path, severity_min?, status?)` | Read/filter an existing report.json (cheap, no API). |
 | `show_finding_source(report_path, finding_id, package_path?)` | Show the cited code so you can verify a citation before acting. |
 | `reaudit_diff(package_path, baseline_report_path, model?)` | Re-audit after fixes; returns `fixed / still_open / new`. |

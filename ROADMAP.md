@@ -27,15 +27,15 @@ Anything unchecked is fair game — open an issue to claim it.
 - [x] audit → fix → re-verify loop (read-only auditor + supervised fixer)
 - [ ] Real-world shakedown — drive the loop on a live blueprint end-to-end *(needs an API key)*
 
-## Phase 3 — Deterministic 🚧 (v0.3)
+## Phase 3 — Deterministic ✅ (v0.3)
 
 - [x] Hybrid static-analysis pass — 9 high-precision rules, a free `--static-only` tier, and the `static_scan` tool ([docs/static-analysis.md](docs/static-analysis.md))
-- [ ] Property-test generation (`scrypto-test`) for flagged invariants
+- [x] Property-test generation — compilable `#[ignore]` scrypto-test scaffolds + the `propose_tests` tool
 
-## Phase 4 — Verifiable & connected
+## Phase 4 — Verifiable & connected 🚧 (v0.4)
 
-- [ ] On-chain attestation blueprint (soulbound, code-hash ↔ report-hash)
-- [ ] Public registry / dashboard of attested blueprints
+- [x] On-chain attestation blueprint (soulbound, source-hash ↔ report-hash) + the `attest.py` manifest bridge ([attestation/](attestation/))
+- [ ] Build/deploy the registry to Stokenet + a public dashboard of attested blueprints
 - [ ] Auditor partnership (pre-audit funnel) + Radix grant
 
 ---

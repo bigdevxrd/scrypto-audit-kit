@@ -157,7 +157,12 @@ pip install "mcp[cli]"
 claude mcp add --transport stdio scrypto-audit-kit -- python3 "$PWD/bin/mcp_server.py"
 ```
 
-Tools: `static_scan` (free, no API), `audit_package`, `get_findings`, `show_finding_source`, `reaudit_diff`, `gate`, `get_checklist`. There's also a Claude Code skill (`/scrypto-pre-audit`) and an [AGENTS.md](AGENTS.md) playbook for any agent. Full setup — including the audit→fix→verify loop — in [docs/agents.md](docs/agents.md).
+Tools: `static_scan` (free), `audit_package`, `propose_tests`, `attestation_payload`, `get_findings`, `show_finding_source`, `reaudit_diff`, `gate`, `get_checklist`. There's also a Claude Code skill (`/scrypto-pre-audit`) and an [AGENTS.md](AGENTS.md) playbook for any agent. Full setup — including the audit→fix→verify loop — in [docs/agents.md](docs/agents.md).
+
+### Generate tests, attest on-chain
+
+- **Property tests.** `propose_tests` (or `python3 bin/gen_tests.py <pkg>`) emits compilable `#[ignore]`d `scrypto-test` scaffolds for the coverage gaps — auth negative-paths, happy paths, a value invariant — so closing them is fill-in-the-blank.
+- **On-chain attestation (L3).** `attestation_payload` (or `python3 bin/attest.py <report.json>`) turns a report into a Radix transaction manifest that records a reproducible attestation on-ledger via the [attestation/](attestation/) registry blueprint — a coverage claim bound to your exact source hash, verifiable by re-running the kit. Not a safety guarantee.
 
 ## What's in the kit
 
@@ -175,9 +180,10 @@ scrypto-audit-kit/
 │   └── checklist.md        Eleven vulnerability classes with concrete questions per class.
 ├── references/             Read-only context — production patterns + threat models (5 files).
 ├── schema/                 JSON Schema for the machine-readable report.
-├── bin/                    static_analysis.py · sak_lib.py · mcp_server.py · extract-report.py · ci-gate.py
+├── bin/                    engine + tools: static_analysis.py, gen_tests.py, attest.py, mcp_server.py, …
 ├── tests/                  Stdlib unit tests for the tooling (`make test`).
 ├── docs/                   ci.md (CI + badge) · agents.md (MCP + the fix loop).
+├── attestation/            On-chain attestation registry blueprint (Scrypto, L3).
 ├── .claude/skills/         The scrypto-pre-audit Claude Code skill.
 ├── audit-reports/          Output dir, gitignored.
 └── examples/
