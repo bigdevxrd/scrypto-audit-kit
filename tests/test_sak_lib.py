@@ -2,6 +2,7 @@
 import copy
 import os
 import sys
+import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -90,6 +91,42 @@ class TestSakLib(unittest.TestCase):
 
     def test_read_source_span_no_line(self):
         self.assertIn("error", sak_lib.read_source_span(PKG, "src/lib.rs"))
+
+    def test_read_source_span_absolute_path_confined(self):
+        # An absolute location must not read outside the package (path-traversal / exfil).
+        span = sak_lib.read_source_span(PKG, "/etc/passwd:1")
+        self.assertIn("error", span)
+        self.assertNotIn("snippet", span)
+
+    def test_read_source_span_dotdot_confined(self):
+        span = sak_lib.read_source_span(PKG, "../../../../../../etc/passwd:1")
+        self.assertIn("error", span)
+        self.assertNotIn("snippet", span)
+
+    def test_collect_findings_valid_returns_list(self):
+        self.assertEqual(len(sak_lib.collect_findings(SAMPLE)), 8)
+
+    def test_collect_findings_missing_raises(self):
+        with self.assertRaises(sak_lib.GateError):
+            sak_lib.collect_findings(os.path.join(tempfile.mkdtemp(), "nope.json"))
+
+    def test_collect_findings_allow_missing_returns_none(self):
+        self.assertIsNone(
+            sak_lib.collect_findings(os.path.join(tempfile.mkdtemp(), "nope.json"), allow_missing=True))
+
+    def test_collect_findings_malformed_raises(self):
+        p = os.path.join(tempfile.mkdtemp(), "r.json")
+        with open(p, "w", encoding="utf-8") as fh:
+            fh.write("{not json")
+        with self.assertRaises(sak_lib.GateError):
+            sak_lib.collect_findings(p)
+
+    def test_collect_findings_no_array_raises(self):
+        p = os.path.join(tempfile.mkdtemp(), "r.json")
+        with open(p, "w", encoding="utf-8") as fh:
+            fh.write("{}")
+        with self.assertRaises(sak_lib.GateError):
+            sak_lib.collect_findings(p)
 
 
 if __name__ == "__main__":

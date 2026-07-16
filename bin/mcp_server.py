@@ -63,9 +63,14 @@ def _run_audit(package_path, model, no_compile_check):
     cmd.append(package_path)
     proc = subprocess.run(cmd, cwd=KIT_DIR, capture_output=True, text=True, check=False)
     log = proc.stdout + proc.stderr
-    # Prefer the path audit.sh prints; fall back to the newest report json.
+    # Only trust a report THIS run produced. A newest_report() fallback would return a stale,
+    # unrelated package's report on any failure (bad path, compile fail, API error, injection
+    # refusal) — letting an agent attest an un-audited package as clean. Require a clean exit
+    # AND an emitted `json:` path; otherwise the caller gets an explicit error.
+    if proc.returncode != 0:
+        return None, log
     match = _JSON_PATH_RE.search(proc.stdout)
-    report_path = match.group(1).strip() if match else sak_lib.newest_report(REPORTS_DIR)
+    report_path = match.group(1).strip() if match else None
     return report_path, log
 
 
@@ -136,11 +141,15 @@ def gate(report_path: str, fail_on: str = "high") -> dict:
         fail_on: Highest severity allowed before failing (none|low|medium|high|critical).
 
     Returns:
-        {passed, worst, fail_on, counts, total}.
+        {passed, worst, fail_on, counts, total}. Fails CLOSED (passed=False, with an
+        `error`) on a missing, empty, unreadable, or malformed report — an agent driving an
+        audit->attest loop must never read a green light out of the absence of a report.
     """
-    findings = []
-    for fp in sak_lib.find_reports(report_path):
-        findings.extend(sak_lib.load_report(fp).get("findings", []))
+    try:
+        findings = sak_lib.collect_findings(report_path)
+    except sak_lib.GateError as exc:
+        return {"passed": False, "error": str(exc), "fail_on": fail_on,
+                "worst": None, "counts": {}, "total": 0}
     return sak_lib.gate_verdict({"findings": findings}, fail_on)
 
 

@@ -109,6 +109,38 @@ def gate_verdict(report, fail_on="high"):
     }
 
 
+class GateError(Exception):
+    """A report could not be evaluated — callers MUST treat this as fail-closed (do not pass)."""
+
+
+def collect_findings(path, allow_missing=False):
+    """Gather findings from a report file (or a directory of them), failing CLOSED.
+
+    Returns a flat list of findings. Raises GateError on a missing, unreadable, or malformed
+    report so every caller — the CLI gate, the MCP gate, an agent's audit->attest loop — fails
+    closed instead of passing an un-audited target. When allow_missing is set and no report
+    exists at all, returns None so the caller can choose to pass explicitly.
+
+    This is the single source of truth for "what does the gate see"; do not re-open reports
+    with a bare .get("findings", []) (that silently fails OPEN on a missing/empty report).
+    """
+    files = find_reports(path)
+    if not files:
+        if allow_missing:
+            return None
+        raise GateError(f"no report.json at {path}")
+    findings = []
+    for fp in files:
+        try:
+            report = load_report(fp)
+        except (OSError, ValueError) as exc:  # ValueError covers json.JSONDecodeError
+            raise GateError(f"unreadable report {fp}: {exc}")
+        if not isinstance(report, dict) or not isinstance(report.get("findings"), list):
+            raise GateError(f"report {fp} has no findings array")
+        findings.extend(report["findings"])
+    return findings
+
+
 def finding_signature(finding):
     """A stable-ish identity for a finding across runs.
 
@@ -152,9 +184,17 @@ def read_source_span(base_dir, location, context=3):
         line = int(line_part.split("-")[0])
     except ValueError:
         return {"error": "unparseable line number", "location": location}
-    path = os.path.join(base_dir, file_part)
+    # Confine the read to base_dir. A finding's `location` can originate from an untrusted
+    # blueprint (the LLM tier echoes model-chosen paths) or a supplied report.json, so an
+    # absolute path, a `../` escape, or a symlink pointing outside the package must NOT read
+    # arbitrary host files. realpath() also collapses in-package symlinks that resolve outside.
+    base_real = os.path.realpath(base_dir)
+    resolved = os.path.realpath(os.path.join(base_real, file_part))
+    if os.path.isabs(file_part) or os.path.commonpath([resolved, base_real]) != base_real:
+        return {"error": "location escapes the package directory", "location": location}
+    path = resolved
     if not os.path.isfile(path):
-        return {"error": "file not found", "path": path}
+        return {"error": "file not found", "file": file_part}
     with open(path, encoding="utf-8") as fh:
         lines = fh.readlines()
     start = max(1, line - context)

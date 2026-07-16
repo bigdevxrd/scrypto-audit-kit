@@ -24,26 +24,15 @@ def main():
     args = ap.parse_args()
 
     # Fail CLOSED: a missing, unreadable, or malformed report must not pass the gate.
-    files = sak_lib.find_reports(args.reports)
-    if not files:
-        if args.allow_missing:
-            print(f"warn: no report.json at {args.reports} — passing (--allow-missing)", file=sys.stderr)
-            return 0
-        print(f"::error::no report.json at {args.reports} — failing closed (use --allow-missing to opt out)",
-              file=sys.stderr)
+    # Shares sak_lib.collect_findings with the MCP gate so both surfaces fail closed identically.
+    try:
+        findings = sak_lib.collect_findings(args.reports, allow_missing=args.allow_missing)
+    except sak_lib.GateError as exc:
+        print(f"::error::{exc} — failing closed (use --allow-missing to opt out)", file=sys.stderr)
         return 1
-
-    findings = []
-    for fp in files:
-        try:
-            report = sak_lib.load_report(fp)
-        except (OSError, ValueError) as exc:  # ValueError covers JSONDecodeError
-            print(f"::error::unreadable report {fp}: {exc} — failing closed", file=sys.stderr)
-            return 1
-        if not isinstance(report.get("findings"), list):
-            print(f"::error::report {fp} has no findings array — failing closed", file=sys.stderr)
-            return 1
-        findings.extend(report["findings"])
+    if findings is None:
+        print(f"warn: no report.json at {args.reports} — passing (--allow-missing)", file=sys.stderr)
+        return 0
 
     try:
         verdict = sak_lib.gate_verdict({"findings": findings}, args.fail_on)

@@ -5,6 +5,7 @@ graceful failure here; the cheap tools are checked against the committed sample.
 """
 import os
 import sys
+import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -36,6 +37,38 @@ class TestMcpTools(unittest.TestCase):
     def test_gate(self):
         self.assertFalse(mcp_server.gate(SAMPLE, "high")["passed"])
         self.assertTrue(mcp_server.gate(SAMPLE, "none")["passed"])
+
+    def test_gate_fails_closed_on_missing_report(self):
+        # The MCP gate must NOT read a green light out of the absence of a report.
+        res = mcp_server.gate(os.path.join(tempfile.mkdtemp(), "nope.json"), "high")
+        self.assertFalse(res["passed"])
+        self.assertIn("error", res)
+
+    def test_gate_fails_closed_on_empty_dir(self):
+        res = mcp_server.gate(tempfile.mkdtemp(), "high")
+        self.assertFalse(res["passed"])
+        self.assertIn("error", res)
+
+    def test_gate_fails_closed_on_malformed_report(self):
+        p = os.path.join(tempfile.mkdtemp(), "report.json")
+        with open(p, "w", encoding="utf-8") as fh:
+            fh.write("{not valid json")
+        res = mcp_server.gate(p, "high")
+        self.assertFalse(res["passed"])
+        self.assertIn("error", res)
+
+    def test_run_audit_no_stale_report_on_failure(self):
+        # A failed run must NOT return a pre-existing, unrelated report from audit-reports/
+        # (the old newest_report() fallback would attest the wrong package as clean).
+        os.makedirs(mcp_server.REPORTS_DIR, exist_ok=True)
+        stale = os.path.join(mcp_server.REPORTS_DIR, ".test-stale-DELETEME.json")
+        with open(stale, "w", encoding="utf-8") as fh:
+            fh.write('{"findings": []}')
+        try:
+            path, _log = mcp_server._run_audit("/definitely/not/a/real/path/xyzzy", "claude", True)
+            self.assertIsNone(path)
+        finally:
+            os.remove(stale)
 
     def test_get_checklist(self):
         text = mcp_server.get_checklist()
