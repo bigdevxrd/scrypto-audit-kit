@@ -1,14 +1,16 @@
 # Python SDK — build on the kit
 
-`pip install scrypto-audit-kit` gives you the kit's **deterministic core** as an importable
-library and as `sak-*` commands — this is what an agent developer builds on. The full LLM
-audit (`audit.sh`) needs a clone + aider + an API key, but everything below runs straight from
-the pip package with no key and no toolchain.
+Pip-installing the kit gives you its **deterministic core** as an importable library and as
+`sak-*` commands — this is what an agent developer builds on. The kit isn't on PyPI yet (a
+release is planned), so install from a clone. The full LLM audit (`audit.sh`) needs the clone
++ aider + an API key, but everything below runs from the installed package with no key and no
+toolchain.
 
 ```bash
-pip install scrypto-audit-kit            # core (stdlib only, zero deps)
-pip install "scrypto-audit-kit[mcp]"     # + the MCP server
-pip install "scrypto-audit-kit[schema]"  # + jsonschema validation
+git clone https://github.com/bigdevxrd/scrypto-audit-kit && cd scrypto-audit-kit
+pip install .            # core (stdlib only, zero deps)
+pip install ".[mcp]"     # + the MCP server
+pip install ".[schema]"  # + jsonschema validation
 ```
 
 ```python

@@ -10,14 +10,14 @@ Drop it in CI, or call it from your own agent before spending a model call.
 Exits 0 if the package passes the gate, 1 if it fails, 2 on a usage error. With no path it
 runs against the bundled deliberately-vulnerable fixture so you can see it work immediately.
 
-This uses only the importable, stdlib-only core — `pip install scrypto-audit-kit` and it
-runs anywhere, or run it straight from a clone (the import shim below handles both).
+This uses only the importable, stdlib-only core — `pip install .` from the repo root and it
+runs anywhere, or run it straight from the clone (the import shim below handles both).
 """
 import argparse
 import os
 import sys
 
-# Run installed (pip install scrypto-audit-kit) OR straight from a clone.
+# Run installed (pip install . from the repo root) OR straight from a clone.
 try:
     from scrypto_audit_kit import sak_lib, static_analysis
 except ImportError:

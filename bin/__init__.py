@@ -1,6 +1,7 @@
 """scrypto-audit-kit — the deterministic Python core as an importable library.
 
-`pip install scrypto-audit-kit` makes this package importable:
+Installing the kit (`pip install .` from a clone — not yet on PyPI) makes this package
+importable:
 
     from scrypto_audit_kit import static_analysis, sak_lib, attest, gen_tests
 

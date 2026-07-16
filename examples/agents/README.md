@@ -8,8 +8,8 @@ before pointing them at your own package.
 They import the kit two ways depending on how you installed it — both work:
 
 ```bash
-pip install scrypto-audit-kit        # then the imports below resolve anywhere
-# ...or just run them from a clone; each script falls back to ../../bin automatically.
+pip install .        # from the repo root — then the imports below resolve anywhere
+# ...or skip the install; each script falls back to ../../bin automatically.
 ```
 
 | Script | Tier | Needs a key? | Shows |

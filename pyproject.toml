@@ -4,7 +4,7 @@
 # bin/ scripts, and the test suite all work that way and this file changes none of it.
 # What it ADDS is a pip-installable layer so agent developers can
 #
-#     pip install scrypto-audit-kit
+#     pip install .        # from the repo root (not yet on PyPI; release planned)
 #     from scrypto_audit_kit import static_analysis, sak_lib, attest, gen_tests
 #
 # plus console entry points (sak-static, sak-gate, ...). The full LLM audit (audit.sh)
