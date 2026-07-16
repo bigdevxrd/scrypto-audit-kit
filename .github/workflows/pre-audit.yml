@@ -31,9 +31,17 @@ on:
 jobs:
   pre-audit:
     runs-on: ubuntu-latest
+    # Least privilege: a reusable workflow inherits the CALLER's token scope, so hard-cap it
+    # here — the audit only reads code. (It can only downgrade the caller, never widen it.)
+    permissions:
+      contents: read
     steps:
       - name: Check out the project under audit
         uses: actions/checkout@v4
+        with:
+          # The audit compiles this (untrusted) tree, executing its build.rs — do NOT leave the
+          # GITHUB_TOKEN in .git/config where a build script could read it.
+          persist-credentials: false
 
       - name: Check out scrypto-audit-kit
         uses: actions/checkout@v4
@@ -41,6 +49,7 @@ jobs:
           repository: bigdevxrd/scrypto-audit-kit
           ref: ${{ inputs.kit-ref }}
           path: .scrypto-audit-kit
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:

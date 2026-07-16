@@ -12,8 +12,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   scrypto-pre-audit:
+    # Pin the kit to a release tag/SHA for reproducible, supply-chain-safe runs (not @main —
+    # that runs whatever is on the kit's HEAD in your CI, with your ANTHROPIC_API_KEY in reach).
     uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@main
     with:
       package: packages/my-blueprint   # ← change to your package path
