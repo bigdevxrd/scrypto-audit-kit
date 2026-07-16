@@ -131,6 +131,21 @@ def _matches(lines, pattern):
             yield lineno, line, m
 
 
+def _finditer_lines(text, pattern):
+    """Yield (lineno, line_text, match) for a pattern over the WHOLE stripped text.
+
+    Unlike _matches (line-by-line), this catches a construct split across lines — `take_all\\n()`
+    or a rustfmt-wrapped role list — because `\\s*` in the pattern spans the newline. Line-scoped
+    rules were evadable by exactly this split; prefer this for any rule whose pattern has a `\\s*`
+    a hostile author could stuff a newline into. lineno is the 1-indexed line the match STARTS on.
+    """
+    rx = re.compile(pattern) if isinstance(pattern, str) else pattern
+    lines = text.split("\n")
+    for m in rx.finditer(text):
+        lineno = text.count("\n", 0, m.start()) + 1
+        yield lineno, lines[lineno - 1], m
+
+
 def _f(line, rule_id, severity, klass, title, what, why, fix):
     return {
         "line": line, "rule": rule_id, "severity": severity, "class": klass,
@@ -140,7 +155,11 @@ def _f(line, rule_id, severity, klass, title, what, why, fix):
 
 @rule
 def r_float_usage(ctx):
-    for lineno, line, _m in _matches(ctx["stripped_lines"], r"\b(f32|f64)\b"):
+    # Match f32/f64 as a type reference (preceded by a non-word char: `: f64`, `as f64`, `<f64>`)
+    # AND as a numeric-literal suffix (`0.05f64`, `3f32`, `1.5_f64`) — the leading `\b` in the old
+    # pattern skipped suffixed literals, since a digit before `f` is a word char (no boundary).
+    pat = re.compile(r"(?<![A-Za-z0-9_])f(?:32|64)\b|\b\d[\d_]*(?:\.\d[\d_]*)?f(?:32|64)\b")
+    for lineno, line, _m in _matches(ctx["stripped_lines"], pat):
         yield _f(lineno, "float-usage", "high", "Integer / decimal arithmetic",
                  "floating-point type in financial code",
                  f"`{line.strip()[:80]}` uses f32/f64.",
@@ -163,12 +182,15 @@ def r_hardcoded_address(ctx):
 
 @rule
 def r_unbounded_take_all(ctx):
-    for lineno, line, _m in _matches(ctx["stripped_lines"], r"\.take_all\s*\("):
+    # whole-text so `take_all\n(` (a valid-Rust newline split) can't evade a line scan; also catch
+    # the semantically identical full drain written as take(<vault>.amount()).
+    pat = re.compile(r"\.take_all\s*\(|\.take\s*\(\s*[\w.]*\.amount\s*\(\s*\)\s*\)")
+    for lineno, line, _m in _finditer_lines(ctx["stripped"], pat):
         yield _f(lineno, "unbounded-take-all", "medium", "Resource handling",
-                 "unbounded vault drain via take_all()",
+                 "unbounded vault drain (take_all / take(amount()))",
                  f"`{line.strip()[:80]}` empties the whole vault in one call.",
                  "An unbounded withdrawal is a large blast radius if the method is ever reachable by the wrong caller.",
-                 "Prefer a bounded take(amount) with a per-call cap; reserve take_all() for fully-trusted paths.")
+                 "Prefer a bounded take(amount) with a per-call cap; reserve full drains for fully-trusted paths.")
 
 
 @rule
@@ -184,10 +206,11 @@ def r_owner_role_none(ctx):
 
 @rule
 def r_self_updatable_role(ctx):
-    pat = re.compile(r"(\w+)\s*=>\s*updatable_by:\s*\[\s*([\w, ]+?)\s*\]")
-    for lineno, line, m in _matches(ctx["stripped_lines"], pat):
+    # whole-text + `\s` in the updater class so a rustfmt-wrapped list (`[\n  admin\n]`) can't evade.
+    pat = re.compile(r"(\w+)\s*=>\s*updatable_by:\s*\[\s*([\w,\s]+?)\s*\]")
+    for lineno, line, m in _finditer_lines(ctx["stripped"], pat):
         role = m.group(1)
-        updaters = [u.strip() for u in m.group(2).split(",") if u.strip()]
+        updaters = [u for u in re.split(r"[,\s]+", m.group(2)) if u]
         if updaters == [role]:
             yield _f(lineno, "self-updatable-role", "medium", "Upgrade safety",
                      f"role `{role}` can rotate itself",
@@ -198,7 +221,8 @@ def r_self_updatable_role(ctx):
 
 @rule
 def r_unsafe_block(ctx):
-    for lineno, line, _m in _matches(ctx["stripped_lines"], r"\bunsafe\s*\{"):
+    # whole-text so `unsafe\n{` can't evade the line scan.
+    for lineno, line, _m in _finditer_lines(ctx["stripped"], r"\bunsafe\s*\{"):
         yield _f(lineno, "unsafe-block", "medium", "Memory safety",
                  "unsafe block",
                  f"`{line.strip()[:80]}` uses an unsafe block.",
@@ -272,7 +296,9 @@ def r_unwrap_expect(ctx):
 
 @rule
 def r_public_mint_burn(ctx):
-    for lineno, line, m in _matches(ctx["stripped_lines"], r"\bpub\s+fn\s+\w*(mint|burn)\w*\s*\("):
+    # whole-text so `pub\nfn mint_free(` can't evade the line scan.
+    pat = re.compile(r"\bpub\s+fn\s+\w*(mint|burn)\w*\s*\(")
+    for lineno, line, m in _finditer_lines(ctx["stripped"], pat):
         yield _f(lineno, "public-mint-burn", "medium", "Auth bypass",
                  f"{m.group(1)} method — confirm it is role-gated",
                  f"`{line.strip()[:80]}` is a public fn that {m.group(1)}s.",
@@ -286,12 +312,16 @@ _SUPPRESS_RE = re.compile(r"//\s*sak:allow\s+([\w-]+)")
 
 
 def _suppressed(comment_lines, line, rule_id):
-    """True if `// sak:allow <rule>` is on this line or the line above (1-indexed). Operates on the
-    comments-visible view, so a suppression token inside a string literal does not suppress."""
+    """True if `// sak:allow <rule-id>` is on this line or the line above (1-indexed). Operates on
+    the comments-visible view, so a token inside a string literal does not suppress.
+
+    A specific rule id is REQUIRED — the blanket `// sak:allow all` is rejected. The suppression
+    lives in source authored by the party under audit, so a blanket "hide everything" is a hole:
+    each suppression must name its rule and is then visible per-line in review/diff."""
     for candidate in (line, line - 1):
         if 1 <= candidate <= len(comment_lines):
             m = _SUPPRESS_RE.search(comment_lines[candidate - 1])
-            if m and m.group(1) in (rule_id, "all"):
+            if m and m.group(1) == rule_id:
                 return True
     return False
 

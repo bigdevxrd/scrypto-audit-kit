@@ -93,8 +93,9 @@ class TestSuppression(unittest.TestCase):
     def test_suppress_on_line_above(self):
         self.assertEqual(fired("// sak:allow unbounded-take-all\nself.vault.take_all();"), set())
 
-    def test_suppress_all(self):
-        self.assertEqual(fired("self.vault.take_all(); // sak:allow all"), set())
+    def test_suppress_all_is_rejected(self):
+        # blanket `sak:allow all` must NOT zero findings — the auditee could hide everything.
+        self.assertIn(("unbounded-take-all", 1), fired("self.vault.take_all(); // sak:allow all"))
 
     def test_suppress_wrong_rule_still_fires(self):
         self.assertIn(("unbounded-take-all", 1), fired("self.vault.take_all(); // sak:allow float-usage"))
@@ -167,6 +168,30 @@ class TestEvasionsFixed(unittest.TestCase):
 
     def test_take_all_multiline_caught(self):
         self.assertIn("unbounded-take-all", {r for r, _ in fired("self.vault.take_all(\n)")})
+
+    def test_take_all_newline_before_paren_caught(self):
+        # the evasion the review found: newline BETWEEN take_all and its ( — line scan missed it
+        self.assertIn("unbounded-take-all", {r for r, _ in fired("self.vault.take_all\n();")})
+
+    def test_take_amount_full_drain_caught(self):
+        self.assertIn("unbounded-take-all", {r for r, _ in fired("let b = self.vault.take(self.vault.amount());")})
+
+    def test_unsafe_newline_split_caught(self):
+        self.assertIn("unsafe-block", {r for r, _ in fired("unsafe\n{ ptr::read(p) }")})
+
+    def test_public_mint_newline_split_caught(self):
+        self.assertIn("public-mint-burn", {r for r, _ in fired("pub\nfn mint_free(&mut self) {}")})
+
+    def test_self_updatable_role_wrapped_list_caught(self):
+        self.assertIn("self-updatable-role", {r for r, _ in fired("admin => updatable_by: [\n    admin\n];")})
+
+    def test_suffixed_float_literal_caught(self):
+        self.assertIn("float-usage", {r for r, _ in fired("let slippage = 0.05f64;")})
+        self.assertIn("float-usage", {r for r, _ in fired("let n = 3f32;")})
+
+    def test_float_not_matched_inside_identifier(self):
+        # a broadened float rule must not fire on identifiers that merely contain f64/f32
+        self.assertEqual(fired("let buffer2f64_len = compute();"), set())
 
     def test_hardcoded_address_broadened(self):
         addr = "pool_rdx1qcdefghjkmnpqrstuvwxyz23456789"
