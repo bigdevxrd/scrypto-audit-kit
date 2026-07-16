@@ -26,7 +26,10 @@ set -euo pipefail
 
 # ---- arg parsing ------------------------------------------------------------
 MODEL="claude"
-SKIP_COMPILE=0
+# Compile-check is OFF by default: `cargo check` compiles the TARGET, executing its build.rs
+# and proc-macros on this host — arbitrary code from a blueprint you may not trust. Opt in with
+# --compile-check only for code you would run anyway (and see the sandbox note at the pre-flight).
+COMPILE_CHECK=0
 STATIC_ONLY=0
 NO_STATIC=0
 while [[ $# -gt 0 ]]; do
@@ -38,8 +41,10 @@ while [[ $# -gt 0 ]]; do
       echo "  --model <model>      claude (default), deepseek, or both"
       echo "                       both runs DeepSeek first (broad), then Claude"
       echo "                       (deep) and cross-references findings."
-      echo "  --no-compile-check   skip the cargo wasm pre-flight (use when the"
-      echo "                       toolchain isn't set up, e.g. the bundled example)"
+      echo "  --compile-check      run the cargo wasm pre-flight (OFF by default — it"
+      echo "                       COMPILES the target, executing its build scripts on"
+      echo "                       this host; only enable for code you trust/would run)"
+      echo "  --no-compile-check   (default) skip the cargo pre-flight"
       echo "  --static-only        deterministic static rules only — no LLM, no API key."
       echo "                       Free and instant."
       echo "  --no-static          skip the deterministic static pass (LLM only)"
@@ -51,7 +56,8 @@ while [[ $# -gt 0 ]]; do
         echo "error: --model must be claude, deepseek, or both" >&2; exit 1
       fi
       ;;
-    --no-compile-check) SKIP_COMPILE=1 ;;
+    --compile-check) COMPILE_CHECK=1 ;;
+    --no-compile-check) COMPILE_CHECK=0 ;;  # back-compat; compile is off by default now
     --static-only) STATIC_ONLY=1 ;;
     --no-static) NO_STATIC=1 ;;
     *) break ;;
@@ -109,15 +115,16 @@ if [[ ! -f "$TARGET/src/lib.rs" ]]; then
   exit 1
 fi
 
-# ---- pre-flight: compile check ----------------------------------------------
-# Bail early if the code doesn't compile — no point spending LLM time on
-# broken code. Uses release wasm target to match actual deploy target.
-# Skippable with --no-compile-check (e.g. the bundled example, or a toolchain
-# mismatch) — the analysis itself doesn't need a successful build.
+# ---- pre-flight: compile check (opt-in) -------------------------------------
+# When enabled with --compile-check, bail early if the code doesn't compile — no point
+# spending LLM time on broken code. OFF by default because `cargo check` executes the target's
+# build scripts on this host (see the SECURITY note below). The analysis itself never needs a
+# successful build, so leaving it off is safe.
 if [[ "$STATIC_ONLY" == "1" ]]; then
   : # static-only needs no build
-elif [[ "$SKIP_COMPILE" == "1" ]]; then
-  echo "[pre-flight] compile check skipped (--no-compile-check)"
+elif [[ "$COMPILE_CHECK" != "1" ]]; then
+  echo "[pre-flight] compile check OFF (default; compiling runs the target's build scripts)."
+  echo "             opt in with --compile-check for code you trust."
   echo ""
 elif ! command -v cargo >/dev/null 2>&1; then
   echo "[pre-flight] cargo not found — skipping compile check" >&2
@@ -200,9 +207,11 @@ elif [[ "$NO_STATIC" == "1" ]]; then MODE_LABEL="$MODEL (no static)"
 else MODE_LABEL="$MODEL + static"; fi
 REPORT_JSON="${REPORT%.md}.json"
 
-# ---- per-run nonce: authenticates the model's JSON appendix against injection ----
-# A malicious blueprint can get the model to echo a fake JSON block; extract-report.py trusts
-# ONLY the block carrying this run's nonce marker. Built per LLM run (not for --static-only).
+# ---- per-run nonce: authenticates the PROVENANCE of the model's JSON appendix ----
+# Defeats the ECHO variant of injection: a blueprint that gets the model to emit a forged JSON
+# block can't reproduce this unpredictable nonce, so extract-report.py trusts ONLY the block
+# carrying its marker. It does NOT defend against a model PERSUADED by in-source text to report
+# a clean result (that's the untrusted-data boundary in prompts/audit.md). Per LLM run only.
 NONCE=""
 MSG_MAIN=""
 if [[ "$STATIC_ONLY" != "1" ]]; then
