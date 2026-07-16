@@ -124,7 +124,16 @@ elif ! command -v cargo >/dev/null 2>&1; then
   echo ""
 else
   echo "[pre-flight] cargo check (release wasm)..."
-  if ! cargo check --manifest-path "$TARGET/Cargo.toml" \
+  # SECURITY: 'cargo check' COMPILES the target, which EXECUTES its build.rs and any proc-macros
+  # on this host — arbitrary code from a blueprint you may not trust. Two guards here:
+  #   (1) scrub API keys from the subprocess env so a hostile build script can't read them;
+  #   (2) warn loudly so the operator knows untrusted code is about to run.
+  # This does NOT sandbox the execution itself — do not compile-check a blueprint you would not
+  # run, or use --no-compile-check. A real sandbox (container/VM, dropped env, no network) is the
+  # tracked full fix; until then the code-execution risk remains even with keys scrubbed.
+  echo "[pre-flight] note: compiling executes the target's build scripts/proc-macros on this host." >&2
+  if ! env -u ANTHROPIC_API_KEY -u DEEPSEEK_API_KEY \
+         cargo check --manifest-path "$TARGET/Cargo.toml" \
          --release --target wasm32-unknown-unknown 2>/dev/null; then
     echo "error: cargo check failed — fix compile errors before auditing." >&2
     echo "       (or re-run with --no-compile-check to audit anyway)" >&2

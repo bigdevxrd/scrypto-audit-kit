@@ -27,9 +27,14 @@ jobs:
           python-version: '3.12'
 
       - name: Verify the release tag matches VERSION
+        # Bind the attacker-controllable tag to an env var and quote the variable — never
+        # interpolate ${{ github.event.* }} into a run script (bash re-runs command substitution
+        # inside it, so a crafted tag executes in this id-token:write / PyPI-publish job).
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           want="v$(cat VERSION)"
-          got="${{ github.event.release.tag_name }}"
+          got="$RELEASE_TAG"
           if [ "$want" != "$got" ]; then
             echo "::error::release tag '$got' does not match VERSION ('$want') — bump VERSION or fix the tag."
             exit 1
