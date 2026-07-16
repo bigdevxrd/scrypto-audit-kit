@@ -51,6 +51,9 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     --model)
+      if [[ $# -lt 2 ]]; then
+        echo "error: --model needs a value (claude|deepseek|both)" >&2; exit 1
+      fi
       shift; MODEL="$1"
       if [[ "$MODEL" != "claude" && "$MODEL" != "deepseek" && "$MODEL" != "both" ]]; then
         echo "error: --model must be claude, deepseek, or both" >&2; exit 1

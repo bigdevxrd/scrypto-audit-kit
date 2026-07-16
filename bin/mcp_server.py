@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """MCP server for scrypto-audit-kit — the pre-audit as tools any agent can call.
 
-Tools: audit_package, get_findings, reaudit_diff, gate, get_checklist, show_finding_source.
+Tools (9): audit_package, static_scan, propose_tests, attestation_payload, get_findings,
+reaudit_diff, gate, get_checklist, show_finding_source. See TOOLS below for the registered set.
 Together they enable the audit -> fix -> re-verify loop: the auditor stays read-only, the
 agent (with a human in the loop) applies fixes, and reaudit_diff confirms what actually closed.
 
