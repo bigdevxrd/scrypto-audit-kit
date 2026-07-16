@@ -377,6 +377,7 @@ fi
 if command -v python3 >/dev/null 2>&1; then
   REPORT_MODEL="$MODEL_DESC"
   if [[ "$STATIC_ONLY" == "1" ]]; then REPORT_MODEL="static-only"; fi
+  extract_rc=0
   python3 "$KIT_DIR/bin/extract-report.py" \
     --raw "$REPORT" --out-json "$REPORT_JSON" --out-md "$REPORT" \
     --kit-version "$KIT_VERSION" --model "$REPORT_MODEL" \
@@ -385,7 +386,16 @@ if command -v python3 >/dev/null 2>&1; then
     --files "${#TARGET_FILES[@]}" --generated-at "$DATE" \
     --static-json "$STATIC_FINDINGS" --nonce "$NONCE" \
     --schema "$KIT_DIR/schema/audit-report.schema.json" \
-    || echo "warn: report.json not produced (see above)" >&2
+    || extract_rc=$?
+  # exit 3 = the JSON appendix failed nonce authentication (possible injection). Do NOT swallow
+  # it — fail the whole run non-zero so CI keyed on the exit code, and any operator, sees it.
+  if [[ "$extract_rc" == "3" ]]; then
+    echo "error: pre-audit REFUSED — the model's JSON appendix was not nonce-authenticated" >&2
+    echo "       (possible prompt injection). No report.json written; re-run the audit." >&2
+    exit 3
+  elif [[ "$extract_rc" != "0" ]]; then
+    echo "warn: report.json not produced (extract-report exit $extract_rc)" >&2
+  fi
 else
   echo "warn: python3 not found — skipping report.json (markdown still written)" >&2
 fi

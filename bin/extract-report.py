@@ -27,7 +27,7 @@ FENCE_RE = re.compile(r"```(?:json)?\s*\n(.*?)\n```", re.DOTALL)
 
 
 def extract_json_blocks(text):
-    """Return (span, parsed_obj, preceding_text) for each fenced JSON block that parses."""
+    """Return (span, parsed_obj) for each fenced JSON block that parses, in document order."""
     blocks = []
     for m in FENCE_RE.finditer(text):
         body = m.group(1).strip()
@@ -37,24 +37,41 @@ def extract_json_blocks(text):
             obj = json.loads(body)
         except json.JSONDecodeError:
             continue
-        blocks.append((m.span(), obj, text[max(0, m.start() - 200):m.start()]))
+        blocks.append((m.span(), obj))
     return blocks
 
 
-def select_appendix(blocks, nonce):
+def select_appendix(text, blocks, nonce):
     """Pick the authoritative JSON block.
 
-    With a per-run `nonce`, ONLY accept a block immediately preceded by the harness's
-    `sak:nonce:<nonce>` marker. This defeats a malicious blueprint that gets the model to echo
-    a fake JSON block — the attacker can't know the per-run nonce. Returns
-    (selected_or_None, authenticated). When no nonce is required (static-only / legacy) the
-    last block is returned and treated as authentic.
+    With a per-run `nonce`, a block is authentic ONLY if the `sak:nonce:<nonce>` marker is the
+    LAST non-whitespace content immediately before its opening fence — ADJACENCY, not a fuzzy
+    "within 200 chars" window. The old window let a small real block lend its marker to a LATER
+    attacker block (which then won as the last authed block); adjacency + scanning only the gap
+    since the previous block closes that. If MORE THAN ONE block authenticates, refuse (a run
+    carries exactly one) and prefer the FIRST otherwise. Without a nonce (static-only / legacy)
+    the last block is returned.
+
+    Returns (selected_block_or_None, authenticated, ambiguous).
     """
-    if nonce:
-        marker = f"sak:nonce:{nonce}"
-        authed = [b for b in blocks if marker in b[2]]
-        return (authed[-1], True) if authed else (None, False)
-    return (blocks[-1] if blocks else None), True
+    if not nonce:
+        return (blocks[-1] if blocks else None), True, False
+    marker = f"sak:nonce:{nonce}"
+    authed = []
+    prev_end = 0
+    for span, obj in blocks:
+        start, end = span
+        preamble = text[prev_end:start]  # only the gap since the previous block — no reach-back
+        prev_end = end
+        idx = preamble.rfind(marker)
+        if idx == -1:
+            continue
+        tail = preamble[idx + len(marker):].replace("-->", "", 1)  # only the comment close may follow
+        if tail.strip() == "":
+            authed.append((span, obj))
+    if len(authed) > 1:
+        return None, False, True  # ambiguous — refuse, fail safe
+    return (authed[0] if authed else None), bool(authed), False
 
 
 def strip_json_appendix(text, span):
@@ -112,34 +129,43 @@ def main():
         raw = fh.read()
 
     static_findings = []
+    static_ran = False
     if args.static_json:
         try:
             with open(args.static_json, encoding="utf-8") as fh:
                 static_findings = json.load(fh)
+            static_ran = True  # the static pass ran (even if it found nothing) — a clean run is attestable
         except (OSError, ValueError) as exc:
             print(f"warn: could not read static findings {args.static_json}: {exc}", file=sys.stderr)
 
     blocks = extract_json_blocks(raw)
-    selected, authenticated = select_appendix(blocks, args.nonce)
+    selected, authenticated, ambiguous = select_appendix(raw, blocks, args.nonce)
     if args.nonce and blocks and not authenticated:
-        # The model produced JSON block(s) but none carry this run's nonce marker — possible
-        # injection (a malicious blueprint getting the model to echo a fake block). Fail safe:
-        # never write report.json from an untrusted block.
+        # JSON block(s) present but none is uniquely nonce-authenticated (missing marker, or
+        # ambiguous — >1 authed). Possible injection: a blueprint getting the model to echo a
+        # forged block. Fail safe — never write report.json, and WITHHOLD the model's prose
+        # (a clean-looking narrative an operator might share) rather than emit it invisibly.
+        reason = "ambiguous nonce (more than one authenticated block)" if ambiguous else "no run nonce"
         with open(args.out_md, "w", encoding="utf-8") as fh:
-            fh.write("<!-- SECURITY: untrusted JSON appendix refused (no run nonce) -->\n" + raw)
-        print("::error::SECURITY — the JSON appendix is not nonce-authenticated; refusing it. "
+            fh.write("# ⚠ Pre-audit REFUSED — possible prompt injection\n\n"
+                     f"The model's JSON appendix was not authenticated by this run's nonce ({reason}). "
+                     "A blueprint may have injected a forged 'all clear' block, so report.json was NOT "
+                     "written and the model's prose is withheld. Re-run the audit.\n")
+        print(f"::error::SECURITY — the JSON appendix is not nonce-authenticated ({reason}); refusing it. "
               "report.json NOT written; re-run the audit.", file=sys.stderr)
         return 3
 
     span = None
     if selected is not None:
-        span, obj, _ = selected
+        span, obj = selected
         for f in obj.get("findings", []):
             f.setdefault("source", "llm")
         if static_findings:  # hybrid run — merge static into the LLM findings
             obj["findings"] = sak_lib.merge_findings(obj.get("findings", []), static_findings)
-    elif static_findings:
-        # No LLM block — assemble the report from the static findings alone (static-only tier).
+    elif static_ran:
+        # No LLM block — assemble the report from the static pass alone (static-only tier). Build
+        # it even when the pass found NOTHING: a clean audit is a first-class, attestable result
+        # and the file-mode gate / L3 attestation both need a report.json to exist.
         obj = sak_lib.build_report(static_findings)
     else:
         # Neither — keep the human report, skip JSON. Never fail the pipeline.
