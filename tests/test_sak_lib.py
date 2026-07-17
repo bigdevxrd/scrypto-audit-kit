@@ -10,6 +10,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "bin"))
 
 import sak_lib  # noqa: E402
+import static_analysis  # noqa: E402
 
 SAMPLE = os.path.join(ROOT, "examples", "vulnerable-vault.pre-audit.json")
 PKG = os.path.join(ROOT, "examples", "vulnerable-vault")
@@ -79,6 +80,43 @@ class TestSakLib(unittest.TestCase):
         a = [{"class": "X", "title": "t", "severity": "high"}]
         b = [{"class": "X", "title": "t", "severity": "high"}]
         self.assertEqual(len(sak_lib.merge_findings(a, b)), 1)
+
+    def test_merge_keeps_distinct_static_locations(self):
+        # two static findings share a signature but sit at different lines — both are real footguns
+        # and must survive the merge (regression: the bare-signature dedup collapsed them into one).
+        extra = [
+            {"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:86"},
+            {"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:98"},
+        ]
+        merged = sak_lib.merge_findings([], extra)
+        self.assertEqual(sorted(f["location"] for f in merged), ["src/lib.rs:86", "src/lib.rs:98"])
+
+    def test_merge_dedups_same_signature_same_location(self):
+        # a genuine duplicate — same signature AND same location — still collapses to one.
+        extra = [
+            {"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:86"},
+            {"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:86"},
+        ]
+        self.assertEqual(len(sak_lib.merge_findings([], extra)), 1)
+
+    def test_merge_llm_suppresses_static_regardless_of_line(self):
+        # the LLM's location-independent dedup is preserved: an LLM finding suppresses a static one
+        # that shares its signature even when the cited line differs by a line or two.
+        primary = [{"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:87", "source": "llm"}]
+        extra = [{"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:86", "source": "static"}]
+        merged = sak_lib.merge_findings(primary, extra)
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["source"], "llm")
+
+    def test_full_merge_keeps_all_fixture_findings(self):
+        # oracle: a full/merged run over the planted-bug fixture must surface all 5 static findings,
+        # not 4 — the two `raw arithmetic` findings (src/lib.rs:86 and :98) must not collapse.
+        static = static_analysis.analyze_package(PKG)
+        self.assertEqual(len(static), 5)
+        merged = sak_lib.merge_findings([], static)  # empty LLM appendix — pure static-into-hybrid merge
+        self.assertEqual(len(merged), 5)
+        locs = {f["location"] for f in merged if f["rule"] == "raw-decimal-arith"}
+        self.assertEqual(locs, {"src/lib.rs:86", "src/lib.rs:98"})
 
     def test_read_source_span_marks_cited_line(self):
         span = sak_lib.read_source_span(PKG, "src/lib.rs:87", context=2)

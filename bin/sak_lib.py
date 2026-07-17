@@ -211,17 +211,36 @@ def worst_severity(findings):
     return _label_for_rank(max((_rank(f) for f in findings), default=0))
 
 
+def _finding_location(finding):
+    return str(finding.get("location", "")).strip().lower()
+
+
 def merge_findings(primary, extra):
-    """Append `extra` findings to `primary`, skipping any whose (class, title) signature is
-    already present (so the static pass doesn't duplicate what the LLM already flagged).
+    """Append `extra` findings to `primary`, deduping in two deliberately different ways.
+
+    Against `primary` (the LLM pass): skip an extra whose (class, title, severity) signature a
+    primary finding already carries — location-INDEPENDENT, because the LLM and static pass often
+    cite the same issue a line or two apart and we want one entry, not two (see finding_signature / R6).
+
+    Among the `extra` findings themselves (the static pass): dedup is location-AWARE. Two static
+    findings that share a signature but sit at different locations — e.g. `raw arithmetic` at
+    src/lib.rs:86 and :98 — are genuinely distinct footguns, so both survive; only a true duplicate
+    (same signature AND same location) is dropped. Keying extra-vs-extra on the bare signature (the
+    old behavior) silently collapsed them into one.
+
     Returns a new list: primary order preserved, then the genuinely-new extras."""
-    seen = {finding_signature(f) for f in primary}
+    primary_sigs = {finding_signature(f) for f in primary}
+    seen_extra = set()
     merged = list(primary)
     for f in extra:
         sig = finding_signature(f)
-        if sig not in seen:
-            merged.append(f)
-            seen.add(sig)
+        if sig in primary_sigs:
+            continue
+        key = (sig, _finding_location(f))
+        if key in seen_extra:
+            continue
+        merged.append(f)
+        seen_extra.add(key)
     return merged
 
 
