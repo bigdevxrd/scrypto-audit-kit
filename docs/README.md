@@ -13,6 +13,7 @@ Start with what you want to do.
 |---|---|
 | Install it and run your first pre-audit | [quickstart.md](quickstart.md) |
 | Run only the free, deterministic rules (no API key) | [static-analysis.md](static-analysis.md) |
+| Pick or plug in the LLM engine (claude-api · aider · your own agent) | [backends.md](backends.md) |
 | Gate every PR on a pre-audit and show a badge | [ci.md](ci.md) |
 
 ## Build on it

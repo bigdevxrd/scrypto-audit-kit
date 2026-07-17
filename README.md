@@ -17,9 +17,9 @@ This is a **pre-audit** tool, not an audit. It catches the kinds of issues a car
 For each scrypto package you point it at, the kit:
 
 1. Runs a **deterministic static pass** (free, no API) — a curated set of high-precision Scrypto rules (unbounded drains, no-owner globalize, self-rotating roles, floats, hardcoded addresses, …).
-2. Loads the package's source (Cargo.toml + everything under `src/` and `tests/`) into an [aider](https://aider.chat) session.
+2. Sends the package's source (Cargo.toml + everything under `src/` and `tests/`) to an LLM through an **interchangeable backend** — the Anthropic API directly by default, or aider, or your own agent ([docs/backends.md](docs/backends.md)).
 3. Loads a vulnerability **checklist** (11 classes — auth, reentrancy, decimal, resource handling, time, state machine, external calls, upgrade, oracle, slippage, allowances) and a catalogue of **reference patterns** (Ignition, CaviarNine HyperStake, subintents, a strategy-vault threat model, general scrypto knowledge) as read-only context.
-4. Asks Claude Sonnet 4.6 to produce a structured findings report — summary, findings (Critical → Info), checklist coverage walk, pattern conformance check, test-coverage gaps, open questions for the human auditor.
+4. Asks Claude Sonnet 4.6 (the default model) to produce a structured findings report — summary, findings (Critical → Info), checklist coverage walk, pattern conformance check, test-coverage gaps, open questions for the human auditor.
 5. Merges both passes and writes a markdown report to `audit-reports/<repo>-<package>-<date>.md` **and** a machine-readable `report.json` ([schema](schema/audit-report.schema.json)) that agents and the CI gate consume.
 
 The kit is **read-only by design**. It produces reports; it does not edit your blueprint. Edits to audit-grade code must go through a separate, human-supervised session.
@@ -39,10 +39,10 @@ tiers end to end.
 
 ### Requirements (for the full `./audit.sh` audit)
 
-- [aider](https://aider.chat) (`pip install aider-chat` — version 0.86 or newer)
-- An Anthropic API key (the kit defaults to Claude Sonnet 4.6 — get one at <https://console.anthropic.com>)
-- bash, awk, find (standard on macOS / Linux)
-- `python3` — optional; only needed for the machine-readable `report.json` (the markdown report works without it)
+- **The default `claude-api` backend**: `python3`, the `anthropic` package (`pip install ".[llm]"`), and an Anthropic API key (defaults to Claude Sonnet 4.6 — get one at <https://console.anthropic.com>).
+- bash, awk, find (standard on macOS / Linux).
+- Other backends have their own needs — `--backend aider` wants [aider](https://aider.chat) (`pip install aider-chat` ≥ 0.86); `--backend cmd` runs your own command. See [docs/backends.md](docs/backends.md).
+- For `--static-only` you need none of the above — not even `python3` for the markdown report (`python3` is only needed for the machine-readable `report.json`).
 
 The key can be provided in any of three ways:
 
@@ -89,12 +89,12 @@ The report lands in `audit-reports/<repo>-<package>-<YYYY-MM-DD>.md`. Reports ar
 ==> scrypto-audit-kit
     target:    scrypto / my-vault
     path:      /home/me/scrypto/my-vault
-    model:     claude
+    mode:      claude-api / claude-sonnet-4-6 + static
     sources:   3 files
     refs:      6 files (read-only)
     report ->  audit-reports/scrypto-my-vault-2026-05-11.md
 
-[aider runs ...]
+[the backend runs ...]
 
 ==> done. report: audit-reports/scrypto-my-vault-2026-05-11.md
 ```
@@ -105,20 +105,23 @@ The report lands in `audit-reports/<repo>-<package>-<YYYY-MM-DD>.md`. Reports ar
 > so enable it only for code you trust enough to run
 > (`rustup target add wasm32-unknown-unknown` sets up the target).
 
-### Choosing a model
+### Choosing a backend and model
 
-The default is Claude Sonnet 4.6. A `--model` flag selects the analysis model:
+The LLM pass runs through an interchangeable **backend** (full guide:
+[docs/backends.md](docs/backends.md)). The default is `claude-api` — the Anthropic API
+directly, no aider — on Claude Sonnet 4.6:
 
 ```bash
-./audit.sh --model claude   <path>   # default — Sonnet 4.6, best pattern depth
-./audit.sh --model deepseek <path>   # cheaper broad scan (needs DEEPSEEK_API_KEY)
-./audit.sh --model both     <path>   # DeepSeek broad pass, then Claude deep pass,
-                                     # with a cross-model confidence summary
+./audit.sh <path>                            # claude-api + Sonnet 4.6 (default)
+./audit.sh --model claude-opus-4-8 <path>    # a different Anthropic model
+./audit.sh --backend aider --model both <path>   # aider: DeepSeek broad → Claude deep
+./audit.sh --backend cmd --backend-cmd 'python3 my_agent.py' <path>   # your own agent
 ```
 
-`both` runs DeepSeek first for a wide net, feeds its findings to Claude as
-context, and tags findings both models agree on as HIGH confidence. Use it when
-you want a second opinion on a high-stakes blueprint.
+The cross-model modes `--model deepseek` and `--model both` run on the aider backend (passing
+either selects it automatically). `both` runs DeepSeek first for a wide net, feeds its findings
+to Claude, and tags findings both models agree on as HIGH confidence — a second opinion on a
+high-stakes blueprint.
 
 ### Free tier: deterministic static analysis
 
@@ -196,20 +199,20 @@ audit→fix→verify loop, and an MCP client — are in [examples/agents/](examp
 
 ```
 scrypto-audit-kit/
-├── audit.sh                The harness — wraps aider with the right flags + context.
+├── audit.sh                The harness — dispatches the LLM pass to a pluggable backend.
 ├── Makefile                Convenience targets (audit, lint, test, check-deps).
 ├── pyproject.toml          Pip packaging — importable SDK + sak-* console scripts.
 ├── VERSION                 Kit version, stamped into every report.
 ├── VISION.md / ROADMAP.md  The trust-ladder strategy + the live phase checklist.
 ├── AGENTS.md               How an agent should drive the kit (audit → fix → verify).
 ├── .mcp.json               MCP server config (auto-wires the tools in Claude Code).
-├── .aider.conf.yml         Tuned config: model=Sonnet 4.6, no editor/commits, cache on.
+├── .aider.conf.yml         Config for the (optional) aider backend — Sonnet 4.6, no edits.
 ├── prompts/
 │   ├── audit.md            Auditor-role prompt + report structure (incl. the JSON appendix).
 │   └── checklist.md        Eleven vulnerability classes with concrete questions per class.
 ├── references/             Read-only context — production patterns + threat models (5 files).
 ├── schema/                 JSON Schemas — the report + the MCP tool contracts.
-├── bin/                    engine + tools: static_analysis.py, gen_tests.py, attest.py, mcp_server.py, …
+├── bin/                    engine + tools: static_analysis.py, llm_audit.py (claude-api backend), gen_tests.py, attest.py, mcp_server.py, …
 ├── tests/                  Stdlib unit tests for the tooling (`make test`).
 ├── docs/                   The docs suite (quickstart · sdk · mcp-tools · architecture · …).
 ├── attestation/            On-chain attestation registry blueprint (Scrypto, L3).
@@ -226,6 +229,7 @@ scrypto-audit-kit/
 Everything is in **[docs/](docs/README.md)**; the short list:
 
 - [quickstart.md](docs/quickstart.md) — install + run, all three tiers
+- [backends.md](docs/backends.md) — the pluggable LLM backends (claude-api · aider · your own)
 - [static-analysis.md](docs/static-analysis.md) — the deterministic rules (and adding one)
 - [agents.md](docs/agents.md) · [mcp-tools.md](docs/mcp-tools.md) — drive it from an agent / over MCP
 - [sdk.md](docs/sdk.md) — the Python API + console scripts
@@ -274,4 +278,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
 - [Radix Scrypto docs](https://docs.radixdlt.com/docs/scrypto-1)
 - [radixdlt/Ignition](https://github.com/radixdlt/Ignition) — the canonical Radix-team-maintained reference codebase (most of our `references/ignition-patterns.md` extracts from here)
 - [caviarnine/caviarnine-scrypto](https://github.com/caviarnine/caviarnine-scrypto) — Apache-licensed CaviarNine production blueprints
-- [aider](https://aider.chat) — the LLM coding agent this kit wraps
+- [aider](https://aider.chat) — one of the kit's LLM backends (`--backend aider`); the default backend calls the Anthropic API directly

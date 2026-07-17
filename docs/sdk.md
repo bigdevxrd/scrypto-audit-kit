@@ -2,13 +2,15 @@
 
 `pip install scrypto-audit-kit` gives you the kit's **deterministic core** as an importable
 library and as `sak-*` commands — this is what an agent developer builds on. The full LLM
-audit (`audit.sh`) needs a clone + aider + an API key, but everything below runs straight from
-the pip package with no key and no toolchain.
+audit (`audit.sh`) runs from a clone through an LLM [backend](backends.md) (the Anthropic API
+by default) and needs an API key, but everything below runs straight from the pip package with
+no key and no toolchain.
 
 ```bash
 pip install scrypto-audit-kit            # core (stdlib only, zero deps)
 pip install "scrypto-audit-kit[mcp]"     # + the MCP server
 pip install "scrypto-audit-kit[schema]"  # + jsonschema validation
+pip install "scrypto-audit-kit[llm]"     # + the default claude-api audit backend (anthropic)
 ```
 
 ```python
@@ -32,7 +34,8 @@ to `../../bin` automatically — the same import shim works in your own scripts.
 | Full LLM pre-audit | `mcp_server.audit_package` / `audit.sh` | **yes** | **yes** |
 | The checklist text | `mcp_server.get_checklist` | no | clone or `SAK_HOME` |
 
-> The LLM-backed tools shell out to `audit.sh`. Run them from a clone, or set `SAK_HOME` to a
+> The LLM-backed tools shell out to `audit.sh`, which dispatches to the selected
+> [backend](backends.md) (claude-api by default). Run them from a clone, or set `SAK_HOME` to a
 > clone so the installed server can find the harness + prompts.
 
 ## The deterministic core

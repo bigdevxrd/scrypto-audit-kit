@@ -7,9 +7,10 @@
 #     pip install scrypto-audit-kit
 #     from scrypto_audit_kit import static_analysis, sak_lib, attest, gen_tests
 #
-# plus console entry points (sak-static, sak-gate, ...). The full LLM audit (audit.sh)
-# still needs a kit clone + aider; the pip package is the deterministic, no-API-key core
-# and the MCP server. See docs/sdk.md.
+# plus console entry points (sak-static, sak-gate, ...). The full LLM audit (audit.sh) runs
+# from a kit clone through an interchangeable backend (claude-api default / aider / your own);
+# the pip package is the deterministic, no-API-key core and the MCP server. See docs/sdk.md
+# and docs/backends.md.
 
 [build-system]
 requires = ["setuptools>=64"]
@@ -39,6 +40,7 @@ dependencies = []
 [project.optional-dependencies]
 mcp = ["mcp[cli]>=1.0"]          # the MCP server (sak-mcp)
 schema = ["jsonschema>=4.0"]     # opt-in report/contract schema validation
+llm = ["anthropic>=0.40"]        # the default claude-api audit backend (bin/llm_audit.py)
 dev = ["jsonschema>=4.0", "mcp[cli]>=1.0"]
 
 [project.urls]

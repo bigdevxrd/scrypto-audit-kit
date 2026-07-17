@@ -1,7 +1,8 @@
 # Quickstart
 
 Three ways in, cheapest first. The deterministic tier needs nothing but Python; the full
-hybrid audit adds an API key and [aider](https://aider.chat).
+hybrid audit adds an API key and the LLM backend (`anthropic` by default —
+[docs/backends.md](backends.md)).
 
 ## Install
 
@@ -16,8 +17,8 @@ cd scrypto-audit-kit && chmod +x audit.sh
 
 Which one? The pip package gives you the free static analysis, test-scaffold generation, the
 attestation bridge, and the MCP server — as a library and as `sak-*` commands. The full
-`audit.sh` (the LLM checklist pass over your source) lives in the clone, because it drives
-aider. [sdk.md](sdk.md) spells out exactly what runs where.
+`audit.sh` (the LLM checklist pass over your source) lives in the clone. [sdk.md](sdk.md)
+spells out exactly what runs where.
 
 ## 1. Free tier — deterministic static analysis (no API key)
 
@@ -40,6 +41,7 @@ output every other surface consumes. The rules and how to add one:
 ## 2. Full tier — hybrid static + LLM pre-audit
 
 ```bash
+pip install ".[llm]"                 # the default claude-api backend
 export ANTHROPIC_API_KEY=sk-ant-...
 ./audit.sh path/to/your/scrypto/package
 ```
@@ -47,7 +49,9 @@ export ANTHROPIC_API_KEY=sk-ant-...
 Runs the static pass, then an LLM over the [11-class checklist](../prompts/checklist.md) and
 the [reference patterns](../references/), and merges both into one report at
 `audit-reports/<repo>-<package>-<date>.md` (and `.json`). The package must have a `Cargo.toml`
-and `src/lib.rs`. Requirements, model choice (`--model claude|deepseek|both`), and cost are in
+and `src/lib.rs`. The LLM pass goes through an interchangeable **backend** — the Anthropic API
+directly by default (Claude Sonnet 4.6), or aider, or your own agent; pick one with `--backend`
+([docs/backends.md](backends.md)). Model choice and cost are in
 [the README](../README.md#quickstart).
 
 ## 3. Agentic — point an agent at it

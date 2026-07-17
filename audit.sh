@@ -12,11 +12,13 @@
 #
 # What it does:
 #   1. Validates the target is a scrypto package (has Cargo.toml + src/lib.rs)
-#   2. Invokes aider non-interactively with:
-#        - the audit prompt (prompts/audit.md) as the user message
-#        - the checklist (prompts/checklist.md) and all references/*.md as --read context
-#        - the package's source + tests as the editable files (read-only in practice; the
-#          aider config disables auto-commits and the prompt forbids edits)
+#   2. Runs the LLM pass through an interchangeable BACKEND (see docs/backends.md):
+#        - claude-api (default): the Anthropic SDK directly (bin/llm_audit.py), no aider
+#        - aider:                the aider harness (keeps --model deepseek|both)
+#        - cmd:                  a bring-your-own command (--backend-cmd), for your own agents
+#      Every backend is fed the same inputs — the audit prompt (prompts/audit.md), the
+#      checklist + all references/*.md as read-only context, and the package source — and
+#      returns a markdown findings report ending in the nonce-stamped §7 JSON appendix.
 #   3. Writes the model's response to audit-reports/<repo>-<package>-<date>.md
 #
 # The kit does NOT edit blueprint source. Edits to audit-grade code go through a
@@ -26,6 +28,8 @@ set -euo pipefail
 
 # ---- arg parsing ------------------------------------------------------------
 MODEL="claude"
+BACKEND_FLAG=""       # --backend; falls back to $SAK_BACKEND, then the default (claude-api)
+BACKEND_CMD_FLAG=""   # --backend-cmd; falls back to $SAK_BACKEND_CMD (only for --backend cmd)
 # Compile-check is OFF by default: `cargo check` compiles the TARGET, executing its build.rs
 # and proc-macros on this host — arbitrary code from a blueprint you may not trust. Opt in with
 # --compile-check only for code you would run anyway (and see the sandbox note at the pre-flight).
@@ -35,12 +39,15 @@ NO_STATIC=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
-      sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
       echo ""
       echo "Options:"
-      echo "  --model <model>      claude (default), deepseek, or both"
-      echo "                       both runs DeepSeek first (broad), then Claude"
-      echo "                       (deep) and cross-references findings."
+      echo "  --backend <name>     LLM engine: claude-api (default), aider, or cmd."
+      echo "                       Env: SAK_BACKEND. See docs/backends.md."
+      echo "  --backend-cmd '<..>'  the command to run for --backend cmd (env: SAK_BACKEND_CMD)"
+      echo "  --model <model>      claude (default) or an explicit model id for the backend."
+      echo "                       For --backend aider: also deepseek or both (both runs"
+      echo "                       DeepSeek broad then Claude deep; these imply --backend aider)."
       echo "  --compile-check      run the cargo wasm pre-flight (OFF by default — it"
       echo "                       COMPILES the target, executing its build scripts on"
       echo "                       this host; only enable for code you trust/would run)"
@@ -50,14 +57,21 @@ while [[ $# -gt 0 ]]; do
       echo "  --no-static          skip the deterministic static pass (LLM only)"
       exit 0
       ;;
+    --backend)
+      if [[ $# -lt 2 ]]; then echo "error: --backend needs a value (claude-api|aider|cmd)" >&2; exit 1; fi
+      shift; BACKEND_FLAG="$1"
+      ;;
+    --backend-cmd)
+      if [[ $# -lt 2 ]]; then echo "error: --backend-cmd needs a command string" >&2; exit 1; fi
+      shift; BACKEND_CMD_FLAG="$1"
+      ;;
     --model)
       if [[ $# -lt 2 ]]; then
-        echo "error: --model needs a value (claude|deepseek|both)" >&2; exit 1
+        echo "error: --model needs a value (claude|deepseek|both, or a model id)" >&2; exit 1
       fi
       shift; MODEL="$1"
-      if [[ "$MODEL" != "claude" && "$MODEL" != "deepseek" && "$MODEL" != "both" ]]; then
-        echo "error: --model must be claude, deepseek, or both" >&2; exit 1
-      fi
+      # No fixed whitelist any more: deepseek/both are aider cross-model modes, and any other
+      # value is passed through as a model id to the selected backend (resolved below).
       ;;
     --compile-check) COMPILE_CHECK=1 ;;
     --no-compile-check) COMPILE_CHECK=0 ;;  # back-compat; compile is off by default now
@@ -67,6 +81,30 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+
+# ---- backend resolution -----------------------------------------------------
+# Precedence: --backend > $SAK_BACKEND > default (claude-api). deepseek/both are aider-only.
+BACKEND="${BACKEND_FLAG:-${SAK_BACKEND:-claude-api}}"
+BACKEND_EXPLICIT=0
+if [[ -n "$BACKEND_FLAG" || -n "${SAK_BACKEND:-}" ]]; then BACKEND_EXPLICIT=1; fi
+if [[ "$MODEL" == "deepseek" || "$MODEL" == "both" ]]; then
+  if [[ "$BACKEND_EXPLICIT" == "1" && "$BACKEND" != "aider" ]]; then
+    echo "error: --model $MODEL is an aider cross-model mode; it needs --backend aider" >&2
+    exit 1
+  fi
+  BACKEND="aider"
+fi
+case "$BACKEND" in
+  claude-api|aider|cmd) ;;
+  *) echo "error: --backend must be claude-api, aider, or cmd (got '$BACKEND')" >&2; exit 1 ;;
+esac
+BACKEND_CMD="${BACKEND_CMD_FLAG:-${SAK_BACKEND_CMD:-}}"
+if [[ "$BACKEND" == "cmd" && "$STATIC_ONLY" != "1" && -z "$BACKEND_CMD" ]]; then
+  echo "error: --backend cmd needs --backend-cmd '<command>' (or \$SAK_BACKEND_CMD)" >&2
+  echo "       the command is fed the prompt + files and must print the report to stdout." >&2
+  echo "       see docs/backends.md for the contract." >&2
+  exit 1
+fi
 if [[ $# -lt 1 ]]; then
   echo "error: missing target path" >&2
   echo "usage: $0 [--model claude|deepseek|both] <path>" >&2
@@ -84,10 +122,11 @@ KIT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Clean up any per-run temp files on exit (message file, composite prompt, static findings).
 trap 'rm -f "${MSG_MAIN:-}" "${COMPOSITE_PROMPT:-}" "${STATIC_FINDINGS:-}" 2>/dev/null || true' EXIT
 
-# ---- API key sourcing (skipped for --static-only) ---------------------------
-# Aider needs ANTHROPIC_API_KEY. Sources, in order: the calling shell, then
-# AIDER_ENV_FILE, then a .env in the kit dir. The key is never echoed.
-if [[ "$STATIC_ONLY" != "1" ]]; then
+# ---- API key sourcing (skipped for --static-only and the cmd backend) -------
+# The claude-api and aider backends need ANTHROPIC_API_KEY; the cmd backend owns its own auth,
+# so it's skipped there. Sources, in order: the calling shell, then AIDER_ENV_FILE, then a .env
+# in the kit dir. The key is never echoed.
+if [[ "$STATIC_ONLY" != "1" && "$BACKEND" != "cmd" ]]; then
   if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
     if [[ -n "${AIDER_ENV_FILE:-}" && -f "$AIDER_ENV_FILE" ]]; then
       set -a
@@ -106,6 +145,20 @@ if [[ "$STATIC_ONLY" != "1" ]]; then
     echo "       export ANTHROPIC_API_KEY=sk-ant-...  |  AIDER_ENV_FILE=/path/.env  |  .env in the kit dir" >&2
     exit 1
   fi
+fi
+
+# ---- backend dependency pre-flight ------------------------------------------
+if [[ "$STATIC_ONLY" != "1" ]]; then
+  case "$BACKEND" in
+    claude-api)
+      if ! command -v python3 >/dev/null 2>&1; then
+        echo "error: the claude-api backend needs python3 (or use --backend aider)." >&2; exit 1
+      fi ;;
+    aider)
+      if ! command -v aider >/dev/null 2>&1; then
+        echo "error: --backend aider needs aider on PATH (pip install aider-chat)." >&2; exit 1
+      fi ;;
+  esac
 fi
 
 # ---- validate scrypto package shape -----------------------------------------
@@ -200,14 +253,22 @@ elif command -v shasum >/dev/null 2>&1; then
 else
   SOURCE_HASH=""
 fi
-case "$MODEL" in
-  deepseek) MODEL_DESC="deepseek/deepseek-chat" ;;
-  both)     MODEL_DESC="deepseek/deepseek-chat + anthropic/claude-sonnet-4-6" ;;
-  *)        MODEL_DESC="anthropic/claude-sonnet-4-6" ;;
+# MODEL_DESC is stamped into the report provenance; make it name what actually ran.
+case "$BACKEND" in
+  claude-api)
+    if [[ "$MODEL" == "claude" ]]; then MODEL_DESC="claude-sonnet-4-6"; else MODEL_DESC="$MODEL"; fi ;;
+  aider)
+    case "$MODEL" in
+      deepseek) MODEL_DESC="deepseek/deepseek-chat" ;;
+      both)     MODEL_DESC="deepseek/deepseek-chat + anthropic/claude-sonnet-4-6" ;;
+      claude)   MODEL_DESC="anthropic/claude-sonnet-4-6" ;;
+      *)        MODEL_DESC="$MODEL" ;;
+    esac ;;
+  cmd) MODEL_DESC="cmd:${BACKEND_CMD%% *}" ;;   # first word of the BYO command
 esac
 if [[ "$STATIC_ONLY" == "1" ]]; then MODE_LABEL="static-only (no LLM)"
-elif [[ "$NO_STATIC" == "1" ]]; then MODE_LABEL="$MODEL (no static)"
-else MODE_LABEL="$MODEL + static"; fi
+elif [[ "$NO_STATIC" == "1" ]]; then MODE_LABEL="$BACKEND / $MODEL_DESC (no static)"
+else MODE_LABEL="$BACKEND / $MODEL_DESC + static"; fi
 REPORT_JSON="${REPORT%.md}.json"
 
 # ---- per-run nonce: authenticates the PROVENANCE of the model's JSON appendix ----
@@ -257,18 +318,38 @@ if [[ "$STATIC_ONLY" == "1" || "$NO_STATIC" != "1" ]]; then
   fi
 fi
 
-# Aider flags:
-#   --no-git, --no-auto-commits, --no-dirty-commits, --no-suggest-shell-commands
-#   --no-show-model-warnings, --no-stream, --yes-always
-#
-# Build --read args (one per reference file)
+# Build --read args (one per reference file) — used by the aider backend.
 READ_ARGS=()
 for f in "${READ_FILES[@]}"; do READ_ARGS+=("--read" "$f"); done
 
 cd "$KIT_DIR"
 
-# ---- run_single: invoke aider with a given model and message file -----------
-run_single() {
+# ---- backends ---------------------------------------------------------------
+# Each backend takes (model, out_file, err_file) [+ msg_file where it wants the pre-assembled
+# prompt], sends the same inputs — audit prompt, checklist + references, target source — to a
+# model, and writes the markdown report (ending in the nonce-stamped §7 JSON appendix) to
+# out_file. The nonce/extract machinery downstream is backend-agnostic; see docs/backends.md.
+
+# claude-api (default): the Anthropic SDK directly, via bin/llm_audit.py. No aider dependency.
+backend_claude_api() {
+  local model="$1" out_file="$2" err_file="$3"
+  local api_model="$model"
+  [[ "$model" == "claude" ]] && api_model="claude-sonnet-4-6"
+  local read_args=() f
+  for f in "${READ_FILES[@]}"; do read_args+=("--read" "$f"); done
+  python3 "$KIT_DIR/bin/llm_audit.py" \
+    --model "$api_model" \
+    --prompt "$KIT_DIR/prompts/audit.md" \
+    --nonce "$NONCE" \
+    --pkg-root "$TARGET" \
+    "${read_args[@]}" \
+    "${TARGET_FILES[@]}" \
+    > "$out_file" 2> >(tee -a "$err_file" >&2)
+  return $?
+}
+
+# aider: the harness the kit originally shipped. Keeps the deepseek/both cross-model modes.
+backend_aider() {
   local model="$1" msg_file="$2" out_file="$3" err_file="$4"
   aider \
     --no-git --no-auto-commits --no-dirty-commits \
@@ -282,15 +363,53 @@ run_single() {
   return $?
 }
 
+# cmd: bring-your-own agent. The command (from --backend-cmd / $SAK_BACKEND_CMD) is run via
+# `sh -c` with the prompt file as $1 and the target files as $2.. ("$@" = prompt + targets),
+# plus SAK_* env vars for everything else, and must print the report to stdout. Contract:
+# docs/backends.md. This is how your own agents (bigdev-agents, Claude Code, …) drive the kit.
+backend_cmd() {
+  local model="$1" msg_file="$2" out_file="$3" err_file="$4"
+  local ctx tgt
+  ctx="$(printf '%s\n' "${READ_FILES[@]}")"
+  tgt="$(printf '%s\n' "${TARGET_FILES[@]}")"
+  SAK_MODEL="$model" \
+  SAK_NONCE="$NONCE" \
+  SAK_PKG_ROOT="$TARGET" \
+  SAK_PROMPT_FILE="$msg_file" \
+  SAK_AUDIT_PROMPT="$KIT_DIR/prompts/audit.md" \
+  SAK_CONTEXT_FILES="$ctx" \
+  SAK_TARGET_FILES="$tgt" \
+    sh -c "$BACKEND_CMD" sak-backend "$msg_file" "${TARGET_FILES[@]}" \
+    > "$out_file" 2> >(tee -a "$err_file" >&2)
+  return $?
+}
+
+# ---- run_backend: dispatch a single-model run to the selected backend -------
+run_backend() {
+  local model="$1" out_file="$2" err_file="$3"
+  case "$BACKEND" in
+    claude-api) backend_claude_api "$model" "$out_file" "$err_file" ;;
+    aider)
+      local am="$model"
+      case "$model" in
+        claude)   am="anthropic/claude-sonnet-4-6" ;;
+        deepseek) am="deepseek/deepseek-chat" ;;
+      esac
+      backend_aider "$am" "$MSG_MAIN" "$out_file" "$err_file" ;;
+    cmd) backend_cmd "$model" "$MSG_MAIN" "$out_file" "$err_file" ;;
+  esac
+}
+
 # ---- run --------------------------------------------------------------------
 if [[ "$STATIC_ONLY" == "1" ]]; then
   # No LLM pass — the report is built from the static findings in the extract step.
   printf '# Audit: %s\n\n_Static-only pre-audit (deterministic rules; no LLM pass)._\n' "$PKG" > "$REPORT"
 elif [[ "$MODEL" == "both" ]]; then
+  # (--model both implies --backend aider; enforced during backend resolution.)
   # Pass 1: DeepSeek — broad, cheap scan
   DEEPSEEK_REPORT="$REPORT.deepseek"
   echo "--- pass 1/2: DeepSeek (broad scan) ---"
-  run_single "deepseek/deepseek-chat" "$KIT_DIR/prompts/audit.md" \
+  backend_aider "deepseek/deepseek-chat" "$KIT_DIR/prompts/audit.md" \
     "$DEEPSEEK_REPORT" "$REPORT.stderr"
   echo "--- pass 1 complete ---"
 
@@ -334,7 +453,7 @@ In your report's summary, add a **Cross-reference** section that lists:
 
 PROMPT
 
-  run_single "anthropic/claude-sonnet-4-6" "$COMPOSITE_PROMPT" \
+  backend_aider "anthropic/claude-sonnet-4-6" "$COMPOSITE_PROMPT" \
     "$CLAUDE_REPORT" "$REPORT.stderr"
   rm -f "$COMPOSITE_PROMPT" 2>/dev/null
   echo "--- pass 2 complete ---"
@@ -360,26 +479,23 @@ PROMPT
   rm -f "$DEEPSEEK_REPORT" "$CLAUDE_REPORT" "$FINDINGS_ONLY" 2>/dev/null
 
 else
-  # Single model run
-  if [[ "$MODEL" == "deepseek" ]]; then
-    AIDER_MODEL="deepseek/deepseek-chat"
-  else
-    AIDER_MODEL="anthropic/claude-sonnet-4-6"
-  fi
-
-  run_single "$AIDER_MODEL" "$MSG_MAIN" \
-    "$REPORT.raw" "$REPORT.stderr" || {
-    echo "==> aider exited non-zero — see $REPORT.stderr" >&2
+  # Single-model run through the selected backend (claude-api default, aider, or cmd).
+  run_backend "$MODEL" "$REPORT.raw" "$REPORT.stderr" || {
+    echo "==> $BACKEND backend exited non-zero — see $REPORT.stderr" >&2
     exit 1
   }
 
-  # Strip aider's chrome to produce a clean report
-  # Recognisable chrome lines start with a fixed banner or a file-add prompt.
-  # Everything after the first valid markdown heading (## or ###) is kept.
-  awk '
-    /^##? / { found=1 }
-    found { print }
-  ' "$REPORT.raw" > "$REPORT" 2>/dev/null || cp "$REPORT.raw" "$REPORT"
+  if [[ "$BACKEND" == "aider" ]]; then
+    # Strip aider's chrome: banner + file-add prompt lines precede the report. Keep
+    # everything from the first valid markdown heading (## or ###) onward.
+    awk '
+      /^##? / { found=1 }
+      found { print }
+    ' "$REPORT.raw" > "$REPORT" 2>/dev/null || cp "$REPORT.raw" "$REPORT"
+  else
+    # claude-api / cmd emit a clean report already — no harness chrome to strip.
+    cp "$REPORT.raw" "$REPORT"
+  fi
   rm -f "$REPORT.raw" 2>/dev/null
 fi
 

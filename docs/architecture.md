@@ -33,9 +33,9 @@ model / checklist version + a sha256 of the analyzed source).
           ┌───────────────┴───────────────┐
           ▼                               ▼
    static pass                      LLM checklist pass
-   static_analysis.py               audit.sh + aider
+   static_analysis.py               audit.sh → backend (claude-api / aider / cmd)
    12 rules · free ·                prompts/ + references/
-   reproducible                     semantic · advisory · needs API key
+   reproducible                     semantic · advisory · needs a backend
           │  S-### findings                │  F-### findings
           └───────────────┬───────────────┘
                           ▼
@@ -50,7 +50,10 @@ model / checklist version + a sha256 of the analyzed source).
 - **Deterministic tier** ([static-analysis.md](static-analysis.md)) catches the mechanical
   footguns a regex can judge — reproducibly, for free. It is the floor every run stands on.
 - **LLM tier** handles what static analysis can't: semantics, intent, cross-method
-  invariants, the 11 checklist classes. Strong signal, **not** byte-reproducible.
+  invariants, the 11 checklist classes. Strong signal, **not** byte-reproducible. It runs
+  through an interchangeable **backend** — the Anthropic API directly (default), aider, or
+  your own agent — behind a stable inputs/output contract ([backends.md](backends.md)), so
+  the merge and everything below it never change with the engine.
 - **Merge** — `sak_lib.merge_findings` appends the static findings the LLM didn't already
   raise (matched by a class+title+severity signature), so one report holds both, de-duplicated.
 

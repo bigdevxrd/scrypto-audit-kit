@@ -1,5 +1,9 @@
 # scrypto-audit-kit aider config
 #
+# Applies only when you run the AIDER backend (`./audit.sh --backend aider`). The default
+# backend is claude-api (the Anthropic SDK directly, bin/llm_audit.py) and does not read this
+# file. See docs/backends.md.
+#
 # This config configures aider as a *read-only auditor*. It produces a markdown
 # findings report; it never edits the blueprint under audit. Edits to audit-grade
 # scrypto code must go through a separate, human-supervised session.

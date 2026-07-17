@@ -4,6 +4,39 @@ Notable changes to scrypto-audit-kit. The kit version lives in [VERSION](VERSION
 stamped into every report; this log follows [Keep a Changelog](https://keepachangelog.com) and
 [SemVer](https://semver.org). The kit was built in a compressed timeline — dates reflect that.
 
+## [0.6.0] — 2026-07-17 — Interchangeable LLM backends
+
+The LLM pre-audit pass is no longer welded to aider. `audit.sh` now dispatches to a pluggable
+**backend** behind a stable inputs/output contract; everything downstream (nonce
+authentication, markdown↔JSON split, static-pass merge, `report.json`, the CI gate,
+attestation) is unchanged. See [docs/backends.md](docs/backends.md).
+
+### Added
+
+- **`claude-api` backend (new default).** [bin/llm_audit.py](bin/llm_audit.py) talks to the
+  Anthropic API directly via the SDK — no aider, no litellm. Prompt caching keeps the auditor
+  prompt + checklist + reference patterns cached across runs. The `llm` extra installs it
+  (`pip install ".[llm]"`). It defaults to **Claude Sonnet 4.6** — the model the kit has always
+  used — and does not change which model audits your code; override with `--model`.
+- **`cmd` backend — bring your own agent.** `--backend cmd --backend-cmd '<command>'` (or
+  `$SAK_BACKEND_CMD`) points the kit at any program that can read the assembled inputs (via
+  `SAK_*` env vars) and print a nonce-stamped report — how your own agents drive the pre-audit.
+- **`--backend` / `$SAK_BACKEND`** select the engine: `claude-api` (default), `aider`, or `cmd`.
+- **[docs/backends.md](docs/backends.md)** — the backends, the model override, and the full
+  BYO-command contract; plus `tests/test_backends.py` (10 tests, the first coverage for
+  `audit.sh` itself).
+
+### Changed
+
+- The **aider harness is now one backend** (`--backend aider`), selected automatically by the
+  cross-model modes `--model deepseek` and `--model both`. Requesting those with a different
+  backend is an error.
+- **Fixed:** `.aider.conf.yml` set `temperature: 0`, which aider ≥ 0.86 rejects
+  (`unrecognized arguments: --temperature=0`) — it had broken the aider LLM path since v0.5.0's
+  R5 pass. Removed; the aider backend runs again.
+
+Tests: 127 → 137 green.
+
 ## [0.5.0] — 2026-06-14 — Developer experience
 
 The kit becomes something you build on, not just run. **Additive only** — every existing run
