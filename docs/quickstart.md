@@ -6,19 +6,18 @@ hybrid audit adds an API key and [aider](https://aider.chat).
 ## Install
 
 ```bash
-# Clone — everything runs straight from the clone, no install needed
+# A) pip — the deterministic toolkit + the MCP server, importable anywhere
+pip install scrypto-audit-kit
+
+# B) clone — everything, including the full LLM audit harness (audit.sh)
 git clone https://github.com/bigdevxrd/scrypto-audit-kit
 cd scrypto-audit-kit && chmod +x audit.sh
-
-# Optional: pip-install from the clone — the deterministic toolkit + the MCP
-# server, importable anywhere. (Not on PyPI yet — a release is planned.)
-pip install .
 ```
 
-Why install? `pip install .` gives you the free static analysis, test-scaffold generation, the
-attestation bridge, and the MCP server — as a library and as `sak-*` commands, usable from any
-directory. The full `audit.sh` (the LLM checklist pass over your source) runs from the clone
-either way, because it drives aider. [sdk.md](sdk.md) spells out exactly what runs where.
+Which one? The pip package gives you the free static analysis, test-scaffold generation, the
+attestation bridge, and the MCP server — as a library and as `sak-*` commands. The full
+`audit.sh` (the LLM checklist pass over your source) lives in the clone, because it drives
+aider. [sdk.md](sdk.md) spells out exactly what runs where.
 
 ## 1. Free tier — deterministic static analysis (no API key)
 

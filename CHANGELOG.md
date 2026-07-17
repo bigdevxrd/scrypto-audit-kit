@@ -11,7 +11,7 @@ path (`audit.sh`, the `bin/` scripts, `.mcp.json`, the test suite) is unchanged.
 
 ### Added
 
-- **Pip-installable package.** `pip install .` from a clone (not yet on PyPI) exposes the deterministic core
+- **Pip-installable package.** `pip install scrypto-audit-kit` exposes the deterministic core
   (`from scrypto_audit_kit import static_analysis, sak_lib, attest, gen_tests`) and `sak-*`
   console scripts (`sak-static`, `sak-gate`, `sak-attest`, `sak-gen-tests`, `sak-mcp`). The core
   is stdlib-only with zero required dependencies; `mcp` and `jsonschema` are opt-in extras.

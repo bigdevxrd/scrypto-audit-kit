@@ -27,16 +27,15 @@ The kit is **read-only by design**. It produces reports; it does not edit your b
 ## Quickstart
 
 ```bash
+pip install scrypto-audit-kit        # the deterministic toolkit + MCP server, no API key needed
+# ...or clone for the full LLM audit harness (audit.sh):
 git clone https://github.com/bigdevxrd/scrypto-audit-kit
-cd scrypto-audit-kit
-pip install .        # optional — the deterministic toolkit + MCP server, no API key needed
 ```
 
-Everything runs straight from the clone with no install — `./audit.sh`, the `bin/` scripts, the
-test suite. The optional `pip install .` adds the free static analysis, test-scaffold
-generation, the attestation bridge, and the MCP server as an importable library and `sak-*`
-commands. (The kit isn't on PyPI yet — a release is planned; install from the clone for now.)
-**[docs/quickstart.md](docs/quickstart.md)** walks all three tiers end to end.
+The pip package gives you the free static analysis, test-scaffold generation, the attestation
+bridge, and the MCP server — importable and as `sak-*` commands. The full `./audit.sh` (the LLM
+checklist pass) lives in the clone. **[docs/quickstart.md](docs/quickstart.md)** walks all three
+tiers end to end.
 
 ### Requirements (for the full `./audit.sh` audit)
 
@@ -173,8 +172,8 @@ Tools: `static_scan` (free), `audit_package`, `propose_tests`, `attestation_payl
 
 ### Build on it — the Python SDK
 
-`pip install .` from a clone makes the deterministic core importable, with zero required
-dependencies (not yet on PyPI — a release is planned):
+`pip install scrypto-audit-kit` makes the deterministic core importable, with zero required
+dependencies:
 
 ```python
 from scrypto_audit_kit import static_analysis, sak_lib
