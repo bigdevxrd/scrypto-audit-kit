@@ -35,7 +35,27 @@ path (`audit.sh`, the `bin/` scripts, `.mcp.json`, the test suite) is unchanged.
 
 - Two unclosed-file `ResourceWarning`s in the test suite.
 
-Tests: 88 → 105 green.
+### Security
+
+A second adversarial hardening pass (2026-07-17) landed before this first published release:
+
+- **Compile pre-flight is now opt-in** (`--compile-check`). `cargo check` executes the
+  target's build scripts and proc-macros on your machine, so the default path no longer runs
+  any untrusted code; `--no-compile-check` is kept as a back-compat no-op, and API keys are
+  scrubbed from the pre-flight environment either way.
+- **Prompt boundary.** The audit prompt declares the target source untrusted data — never
+  instructions — and requires any attempt to steer or suppress the audit to be reported as a
+  finding.
+- **CI workflows.** Least-privilege token, credentials not persisted into the untrusted
+  checkout, and the release workflow no longer shell-interpolates the release tag name
+  (script injection).
+- **Fail-closed report handling.** No stale-report provenance, path-traversal confinement,
+  nonce adjacency in report extraction, refusals fail loud, and static-only runs emit a clean
+  `report.json`.
+- **Static analyzer.** Newline-split evasion closed, drain/float rules broadened, and
+  `sak:allow all` rejected.
+
+Tests: 88 → 105 green (127 after the hardening pass).
 
 ## [0.4.0] — 2026-06-14 — Verifiable & connected, then hardened
 

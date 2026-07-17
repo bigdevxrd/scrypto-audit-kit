@@ -29,10 +29,10 @@ named `ANTHROPIC_API_KEY`. (Or `DEEPSEEK_API_KEY` if you set `model: deepseek`.)
 
 On every PR (and on demand via *Run workflow*) it:
 
-1. compiles your package (`cargo check`, wasm release) and bails if it doesn't build;
-2. runs the pre-audit, producing `report.md` + `report.json`;
-3. uploads both as a build artifact (`pre-audit-report`);
-4. **fails the check** if any finding is at or above `fail-on` (default `high`).
+1. runs the pre-audit, producing `report.md` + `report.json` (the `cargo` compile pre-flight
+   is off by default — the audit reads your code, it doesn't build it);
+2. uploads both as a build artifact (`pre-audit-report`);
+3. **fails the check** if any finding is at or above `fail-on` (default `high`).
 
 Pin `kit-ref:` to a released tag (e.g. `v0.1.0`) so the *method* is fixed over time: the
 static-tier findings then reproduce exactly, while the LLM-tier findings are advisory and

@@ -83,8 +83,8 @@ The report lands in `audit-reports/<repo>-<package>-<YYYY-MM-DD>.md`. Reports ar
 
 ```bash
 ./audit.sh ~/scrypto/my-vault
-[pre-flight] cargo check (release wasm)...
-[pre-flight] compile OK
+[pre-flight] compile check OFF (default; compiling runs the target's build scripts).
+             opt in with --compile-check for code you trust.
 
 ==> scrypto-audit-kit
     target:    scrypto / my-vault
@@ -99,9 +99,11 @@ The report lands in `audit-reports/<repo>-<package>-<YYYY-MM-DD>.md`. Reports ar
 ==> done. report: audit-reports/scrypto-my-vault-2026-05-11.md
 ```
 
-> Note: the harness runs `cargo check --release --target wasm32-unknown-unknown`
-> first and bails if the package doesn't compile — no point spending model time
-> on broken code. Install the wasm target with `rustup target add wasm32-unknown-unknown`.
+> Note: an opt-in `--compile-check` pre-flight runs `cargo check --release --target
+> wasm32-unknown-unknown` first and bails if the package doesn't compile. It is **off by
+> default**: compiling executes the target's build scripts and proc-macros on your machine,
+> so enable it only for code you trust enough to run
+> (`rustup target add wasm32-unknown-unknown` sets up the target).
 
 ### Choosing a model
 

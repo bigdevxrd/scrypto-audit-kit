@@ -38,7 +38,8 @@ static_scan("packages/my-vault") → {"count": 5, "counts": {"medium": 5}, "find
 
 The full hybrid run (static + LLM checklist). Returns the report.json contents plus
 `report_path`, or `{error, log}` if the run produced none. `model` ∈ `claude | deepseek | both`;
-`no_compile_check` skips the `cargo` wasm pre-flight.
+`no_compile_check` is a back-compat no-op — the `cargo` pre-flight is off by default and not
+exposed over MCP, because compiling executes the target's build scripts.
 
 ### propose_tests(package_path)
 

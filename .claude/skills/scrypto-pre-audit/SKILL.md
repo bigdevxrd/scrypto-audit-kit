@@ -20,9 +20,9 @@ If the `scrypto-audit-kit` MCP server is connected, prefer its tools:
 - `gate(report_path, fail_on)` — does it pass at a severity threshold?
 - `get_checklist()` — the 11 vulnerability classes the kit considers (a few are mechanically enforced by the static tier; the rest are walked by the LLM, not deterministically verified).
 
-If the MCP server isn't available, run the CLI: `./audit.sh <package>` (add
-`--no-compile-check` when the wasm toolchain isn't set up), then read the
-`audit-reports/<...>.json` it writes.
+If the MCP server isn't available, run the CLI: `./audit.sh <package>`, then read the
+`audit-reports/<...>.json` it writes. (No toolchain needed — the compile pre-flight is
+off by default; `--compile-check` opts in for trusted code.)
 
 ## Workflow
 

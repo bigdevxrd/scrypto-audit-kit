@@ -19,7 +19,7 @@ the `scrypto-audit-kit` server exposes `static_scan` (free, no API), `audit_pack
 **Via the CLI:**
 
 ```bash
-./audit.sh <path-to-package>          # add --no-compile-check if the toolchain isn't set up
+./audit.sh <path-to-package>          # add --compile-check to also verify it builds (trusted code only)
 # reads audit-reports/<repo>-<package>-<date>.json (schema/audit-report.schema.json)
 ```
 

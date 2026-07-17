@@ -11,7 +11,7 @@ The kit owns the empty middle between "it compiles" and "a human audited it" —
 
 | Rung | What | The kit's part |
 |------|------|----------------|
-| L0 | `cargo check`, clippy | pre-flight only — `audit.sh` bails if it doesn't compile |
+| L0 | `cargo check`, clippy | opt-in pre-flight (`--compile-check`) — off by default, since compiling runs the target's build scripts |
 | **L1** | Agentic pre-audit (audit → fix → verify) | the MCP server, the skill, `AGENTS.md`, the example agents |
 | **L2** | Attested CI run (pinned method, deterministic tier, badge) | the reusable Action + the severity gate |
 | **L3** | On-chain attestation (soulbound, code-hash-bound) | the `attestation/` blueprint + the `attest.py` bridge |
