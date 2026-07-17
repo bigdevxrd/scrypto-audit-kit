@@ -14,7 +14,12 @@
 # value is the fallback for running aider directly.
 model: anthropic/claude-sonnet-4-6
 weak-model: anthropic/claude-sonnet-4-6  # unused — auto-commits are off
-temperature: 0                           # reduce (not eliminate) run-to-run variance
+# NOTE: aider >= 0.86 dropped the top-level `temperature` option (it errors with
+# "unrecognized arguments: --temperature=0"). Temperature is now set per-model via a
+# model-settings file. We don't pin it here: the R5 honesty pass already scopes
+# reproducibility to the static tier + source hash — the LLM tier is explicitly not
+# reproducible, so a near-zero temperature was only a marginal variance reducer, not a
+# correctness guarantee. To re-add it, use --model-settings-file with extra_params.temperature.
 
 architect: false                     # single-model run; no editor handoff
 
