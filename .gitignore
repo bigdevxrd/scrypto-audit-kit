@@ -35,3 +35,9 @@ dist/
 *.egg-info/
 .eggs/
 .pytest_cache/
+
+# Claude agent worktrees (local only)
+.claude/worktrees/
+
+# Retired docs kept on this machine only
+.local-archive/
