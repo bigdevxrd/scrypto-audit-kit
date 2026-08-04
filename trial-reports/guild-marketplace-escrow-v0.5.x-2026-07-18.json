@@ -1,0 +1,162 @@
+{
+  "schema_version": "1.0",
+  "kit": {
+    "version": "0.6.0",
+    "model": "anthropic/claude-opus-4-7",
+    "checklist_version": "1.0",
+    "reference_set": "manual-pass (VPS Claude, human-executed checklist walk — not a CLI run)",
+    "generated_at": "2026-07-18"
+  },
+  "target": {
+    "repo": "github.com/bigdevxrd/guild-saas",
+    "package": "guild-marketplace-escrow (v0.5.x deployed semantics — mainnet component_rdx1cr690hkrk2kv933cw3qdr6amkaphdlu2whjhhh8wppus922yx335r2)",
+    "files_analyzed": 1
+  },
+  "summary": {
+    "overall_risk": "high",
+    "one_liner": "Settlement correctness depends on the CALLER's manifest to route counterparty funds; a malicious or incompetent caller can keep the worker's reward. Confirmed live (BUG-7).",
+    "asset_inventory": [
+      "per-task reward vault (any whitelisted token)",
+      "per-task insurance vault (same token as reward)",
+      "per-task claim_bond vault (XRD)",
+      "forfeited_claim_bonds_vault (XRD, owner-claimable)",
+      "task_receipt NFT (poster ownership proof)",
+      "claim_receipt NFT (worker claim proof)",
+      "owner badge, internal minter badge"
+    ],
+    "trust_boundaries": [
+      "poster (holds task_receipt, calls create/cancel/approve)",
+      "worker (holds worker/agent badge + claim_receipt)",
+      "arbiter (holds arbiter badge — ANY holder can resolve ANY dispute)",
+      "owner (token whitelist + forfeited-bond withdrawal)",
+      "public callers (expire_claim, auto_resolve_dispute — time-gated, no auth)"
+    ],
+    "external_dependencies": [
+      "none at settlement — no external component calls, no oracle, no swaps"
+    ]
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "high",
+      "class": "Resource handling",
+      "location": "src/lib.rs:approve_and_release",
+      "title": "Worker reward delivery depends on the poster's manifest (fund-theft vector)",
+      "what": "approve_and_release drains the reward vault and RETURNS the reward bucket to the caller (the poster), whose transaction manifest is responsible for routing it to the worker's account. The comment states 'reward to caller (the poster — manifest routes to worker)'. Nothing on-chain forces the reward to reach the worker.",
+      "why": "A poster who approves work but crafts a manifest that deposits the returned reward bucket into their OWN account keeps the worker's payment while the task state becomes Released. The worker delivered, the state says paid, but funds went to the poster. This is the classic 'blueprint returns funds to an untrusted signer' delivery gap. Confirmed live on the deployed component (tracked as BUG-7).",
+      "suggested_direction": "Deliver counterparty funds on-chain rather than via the caller's manifest — use Global::<Account>::from(worker).try_deposit_or_abort(bucket, None), with an AccountLocker fallback for deny-listed accounts. This removes the manifest as a trusted delivery path. (The guild team's v0.6.0 redesign already specifies this fix via AccountLocker.)",
+      "confidence": "high",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "F-002",
+      "severity": "high",
+      "class": "Auth bypass",
+      "location": "src/lib.rs:auto_resolve_dispute",
+      "title": "auto_resolve_dispute is PUBLIC and returns counterparty funds to an arbitrary caller",
+      "what": "auto_resolve_dispute is PUBLIC with no auth (time-gated only). After the dispute window elapses, ANY address can call it; it drains reward + insurance and returns the worker/poster share buckets to the caller, who must route them via manifest.",
+      "why": "Same delivery-trust gap as F-001 but worse: the caller is not even a party to the task. A bot watching for expired dispute windows can call auto_resolve_dispute and, via its own manifest, keep the worker's and/or poster's returned buckets. State transitions to terminal while funds are misdirected.",
+      "suggested_direction": "Combine with the F-001 fix: on-chain direct-deposit to the recorded worker_account + poster, never return party funds to the caller's AuthZone on a public, no-auth path. The caller may keep only a fixed keeper incentive, if any.",
+      "confidence": "high",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "F-003",
+      "severity": "medium",
+      "class": "Integer / decimal arithmetic",
+      "location": "src/lib.rs:resolve_dispute / split_funds_for_parties",
+      "title": "Raw Decimal multiplication in fee + split math (panic-on-overflow, not checked)",
+      "what": "Fee and split computations use raw `*` — e.g. arbiter_fee = insurance_vault_amount * arbiter_fee_pct, and reward_amount * worker_pct / reward_amount * poster_pct in the split. Raw Decimal `*` panics on overflow rather than returning Option like checked_mul.",
+      "why": "At realistic reward magnitudes overflow is implausible, but a raw-multiply panic is an unhandled abort that produces a generic engine panic (poor post-mortem) and, on a hostile-input path, a potential griefing/DoS surface. The kit's arithmetic class favours checked ops for all value math.",
+      "suggested_direction": "Use Decimal::checked_mul / checked_div with explicit .expect(\"descriptive\") or graceful handling for every value computation. Make rounding direction explicit (see F-004).",
+      "confidence": "medium",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "F-004",
+      "severity": "medium",
+      "class": "Integer / decimal arithmetic",
+      "location": "src/lib.rs:split_funds_for_parties",
+      "title": "Implicit rounding in Split ruling may orphan dust or mis-allocate",
+      "what": "Split ruling computes worker_reward = reward_amount * worker_pct and poster_reward = reward_amount * poster_pct with implicit rounding. worker_pct + poster_pct == 1 is asserted, but reward*w + reward*p need not equal reward exactly after Decimal rounding, so the two shares can sum to slightly less (dust left in vault) or, in edge cases, more than the vault holds.",
+      "why": "Silent dust accumulation in per-task vaults, or a take() that exceeds the residual balance and panics. The deployed code drains via a combined bucket + take(worker_total) then hands the remainder to the poster, which mitigates the over-allocation case, but the rounding direction is not explicit and dust behaviour is unstated.",
+      "suggested_direction": "Compute one side, then derive the other as the residual (take_all minus the first share) so the split is always exact by construction. Make any rounding favour the vault, and sweep residual dust deterministically to one party.",
+      "confidence": "medium",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "F-005",
+      "severity": "info",
+      "class": "Approvals / allowances",
+      "location": "src/lib.rs:resolve_dispute",
+      "title": "Any arbiter-badge holder can resolve ANY dispute (no per-task arbiter binding)",
+      "what": "resolve_dispute authorises by checking arbiter_badge.resource_address() == arbiter_badge_resource and amount == 1. There is no binding between a specific arbiter and a specific task — any holder of any arbiter badge can resolve any disputed task with any ruling (PayWorker / RefundPoster / Split).",
+      "why": "This is a trust-model property, not necessarily a bug: it assumes arbiter badges are scarce + issued to trusted parties. But it means a single compromised or colluding arbiter badge can unilaterally direct the reward + insurance of every disputed task in the system. Worth surfacing explicitly so the arbiter-badge issuance + revocation posture is a conscious decision.",
+      "suggested_direction": "Document the arbiter trust assumption. Consider per-task arbiter assignment (bind an arbiter id at dispute time) or an M-of-N arbiter quorum for high-value tasks. At minimum ensure arbiter badges are recallable and issuance is tightly controlled.",
+      "confidence": "high",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "F-006",
+      "severity": "low",
+      "class": "State machine",
+      "location": "src/lib.rs:expire_claim",
+      "title": "expire_claim forfeits the entire claim bond to the operator on a public path",
+      "what": "expire_claim is PUBLIC + time-gated; once the claim deadline passes, any caller can expire the claim, forfeiting the WHOLE claim_bond to the forfeited_claim_bonds_vault (operator-claimable) and resetting the task to Open.",
+      "why": "Likely intended (bond = worker skin-in-the-game; forfeiture on no-show is the point). Flagged because the forfeiture is all-or-nothing to the operator with no worker grace, and the public trigger means a worker one second late loses the full bond to a bot racing the deadline. A griefer could monitor + expire aggressively.",
+      "suggested_direction": "Confirm the all-or-nothing forfeiture is the intended economic design. Consider a short grace buffer, or partial forfeiture scaling with lateness, if worker-friendliness matters for adoption.",
+      "confidence": "low",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "F-007",
+      "severity": "low",
+      "class": "Cross-cutting: unwrap/expect",
+      "location": "src/lib.rs (multiple vault lookups)",
+      "title": "Pervasive .unwrap()/.expect() on per-task vault lookups",
+      "what": "Settlement paths repeatedly do self.task_reward_vaults.get_mut(&task_id).unwrap() / .expect(...) on vault + task lookups. These are internal invariants (a task in a settleable state must have its vaults), but any state desync between the tasks KVS and the vault KVS panics the whole transaction.",
+      "why": "Internal-invariant unwraps are acceptable per the checklist IF the panic message is clear. Several are bare .unwrap() with no message, which makes a desync post-mortem hard. Not exploitable given current invariants, but brittle.",
+      "suggested_direction": "Replace bare .unwrap() on vault/task lookups with .expect(\"<invariant that was violated>\") so an unexpected desync produces an actionable abort message. Keep them as invariants; just make the failure legible.",
+      "confidence": "medium",
+      "status": "open",
+      "source": "llm"
+    }
+  ],
+  "checklist_coverage": [
+    { "class": "Auth bypass", "status": "findings", "findings": ["F-002"], "note": "Lifecycle methods are PUBLIC with in-body bucket-burn/Proof checks (deliberate pattern). The gap is the no-auth public settlement path (F-002) + the delivery-trust issues (F-001)." },
+    { "class": "Reentrancy", "status": "not_applicable", "note": "No external component calls at settlement (no Global::method, extern_blueprint!, or object_call). Only internal minter-badge authorize_with_amount. No callback surface." },
+    { "class": "Integer / decimal arithmetic", "status": "findings", "findings": ["F-003", "F-004"], "note": "Raw Decimal * in fee/split math + implicit rounding in the Split ruling." },
+    { "class": "Resource handling", "status": "findings", "findings": ["F-001"], "note": "Buckets are consumed/returned correctly, but reward delivery is routed by the CALLER's manifest (F-001) — the central risk. Option<Bucket> returns on dispute paths require careful manifest handling." },
+    { "class": "Time / epoch checks", "status": "clean", "note": "Deadline comparisons use Clock::current_time_rounded_to_seconds with correct >= direction (expire needs now >= deadline; heartbeat refuses past deadline). Units are seconds throughout. No off-by-one observed." },
+    { "class": "State machine", "status": "findings", "findings": ["F-006"], "note": "Open -> Claimed -> Submitted -> Released|Refunded with a Disputed branch; transitions are guarded by state asserts and one-way to terminal. current_claim_receipt_id prevents orphan-receipt replay. F-006 is an economic-design flag on expire_claim, not a state-integrity bug." },
+    { "class": "External calls / composability", "status": "not_applicable", "note": "No external component invocations. All authority is internal (minter badge). No whitelist of callable external addresses because none are called." },
+    { "class": "Upgrade safety", "status": "not_applicable", "note": "Not upgradeable. Version transitions use fresh instantiation + a new component (per the team's migration design), so no storage-layout-collision risk." },
+    { "class": "Oracle / price dependence", "status": "not_applicable", "note": "No price oracle. Reward + insurance must be the same token (design decision), avoiding any cross-token rate question." },
+    { "class": "Slippage / MEV", "status": "not_applicable", "note": "No swaps or AMM interactions in the blueprint. Value moves are direct vault transfers." },
+    { "class": "Approvals / allowances", "status": "findings", "findings": ["F-005"], "note": "Arbiter badge is any-holder-resolves-any-dispute (F-005). Worker/agent badges are presented as Proofs (skip_checking) and verified against stored claimer_badge_id — no long-lived grant retained by the blueprint." }
+  ],
+  "pattern_conformance": [
+    { "pattern": "funded-before-claimable (no listed-but-unfunded state)", "present": "yes", "note": "create_task takes reward + insurance buckets atomically; a task cannot be Open without funded vaults. Strong." },
+    { "pattern": "bucket-burn auth for one-shot actions", "present": "yes", "note": "cancel/submit/approve consume the receipt NFT via internal-minter burn — clean one-shot authorisation." },
+    { "pattern": "on-chain delivery of counterparty funds", "present": "no", "note": "Counterparty funds are returned to the caller for manifest routing — the F-001/F-002 gap. This is the pattern the v0.6.0 AccountLocker redesign adds." },
+    { "pattern": "checked arithmetic for value math", "present": "partial", "note": "checked_add used for id counters + deadlines; raw * used for fee/split value math (F-003)." }
+  ],
+  "test_coverage_gaps": [
+    "Negative test: a malicious approve_and_release manifest that keeps the reward — asserts the delivery gap (would document F-001 as a known live limitation).",
+    "auto_resolve_dispute called by a non-party caller — asserts fund routing (F-002).",
+    "Split ruling dust: assert reward*w + reward*p reconciles exactly with the vault balance at extreme percentages (0.333/0.667) and low-divisibility tokens (F-004).",
+    "Arbiter cross-task: a badge holder resolving a dispute on a task they were not assigned to — documents F-005 trust assumption."
+  ],
+  "open_questions": [
+    "Is the caller-routes-counterparty-funds delivery model (F-001/F-002) accepted as a known limitation for the current pilot (disputes dormant, dashboard-only manifests), with the AccountLocker fix gated to the Wave-B re-audit? The PROJECT-STATE note suggests yes.",
+    "Is the any-arbiter-resolves-any-dispute trust model (F-005) intentional for launch, or should per-task arbiter binding land before disputes are enabled?",
+    "Is the all-or-nothing expire_claim forfeiture (F-006) the intended worker-incentive design, or should a grace buffer be added for adoption?",
+    "This was a human-executed checklist pass, not a CLI run against the exact deployed bytecode. A CLI run of the kit against the exact v0.5.x source hash would produce the attestable source_hash + confirm no findings were missed in code not re-read this session."
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "schema_version": "1.0",
+  "kit": {
+    "version": "0.6.0",
+    "model": "anthropic/claude-opus-4-7",
+    "checklist_version": "1.0",
+    "reference_set": "manual-pass (VPS Claude, human-executed checklist walk)",
+    "generated_at": "2026-07-18"
+  },
+  "target": {
+    "repo": "github.com/bigdevxrd/meme-grid-game",
+    "package": "meme-game-vault (scrypto/meme-token/src/lib.rs — compile-only, NOT deployed)",
+    "files_analyzed": 1
+  },
+  "summary": {
+    "overall_risk": "medium",
+    "one_liner": "Small, clean fixed-price mint/burn vault. Two real issues before deploy: unbounded admin treasury withdraw (owner-badge = full drain) and self-referential buyer/burner event fields that break the server's own indexing.",
+    "asset_inventory": [
+      "XRD treasury vault (xrd_vault)",
+      "MEME fungible resource (component is sole minter, burn=allow_all)",
+      "owner badge (single, controls admin + owner roles)"
+    ],
+    "trust_boundaries": [
+      "public buyers (buy_meme, burn_meme, views)",
+      "admin/owner (single owner badge — set_paused, withdraw_xrd)",
+      "game server (watches burn_meme receipts to credit play balance)"
+    ],
+    "external_dependencies": [
+      "none — fixed-price mint (no oracle, no AMM, no external component calls)"
+    ]
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "medium",
+      "class": "Auth bypass",
+      "location": "scrypto/meme-token/src/lib.rs:247 (withdraw_xrd)",
+      "title": "Unbounded admin treasury withdrawal — owner-badge compromise drains all XRD",
+      "what": "withdraw_xrd lets admin/owner take any amount up to the full treasury balance in a single call, with no per-call cap, no cooldown, and no secondary policy. admin == owner_badge holder (roles!(admin => require(owner_badge))).",
+      "why": "The entire XRD treasury (all the real value players paid in) sits behind one badge. A compromised or mis-custodied owner badge = total treasury loss in one transaction. This is the same TM-INT-1 pattern flagged on the sats scrypto-xrd vault (owner badge in a hot wallet). For a game vault holding real player XRD, this is the top risk.",
+      "suggested_direction": "Bound admin withdrawal: a per-call cap (e.g. % of treasury), a cooldown between withdrawals, and/or route the owner badge through a Radix Access Controller (cold recovery + confirmation roles) rather than a hot signer. At minimum, keep the owner badge cold and use a separate lower-privilege admin badge for routine ops.",
+      "confidence": "high",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "F-002",
+      "severity": "medium",
+      "class": "State machine",
+      "location": "scrypto/meme-token/src/lib.rs:180 + 204 (BuyMemeEvent / BurnMemeEvent)",
+      "title": "buyer/burner event fields always record the component's OWN address, not the actor",
+      "what": "Both events set the actor field via Runtime::global_component().address(): BuyMemeEvent.buyer and BurnMemeEvent.burner. global_component().address() returns THIS component's global address — so every event records the vault's own address as the buyer/burner, never the real caller.",
+      "why": "The blueprint's stated design is 'game server watches burn_meme() tx receipts to credit play balance' (doc comment L6, L189). If the server reads the burner from the event, it gets the vault address every time and cannot attribute the burn to a player. Any indexer/consumer relying on these fields is broken. The server must instead derive the actor from the transaction's signer/manifest — which should be documented, or the event should carry the real actor.",
+      "suggested_direction": "Either (a) accept the actor as a parameter/Proof and record the real ComponentAddress on the event, or (b) drop the misleading buyer/burner fields and document that attribution comes from the tx signer off-chain. Do NOT leave a field named 'buyer' that always holds the component address — it will silently mis-attribute.",
+      "confidence": "high",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "F-003",
+      "severity": "low",
+      "class": "State machine",
+      "location": "scrypto/meme-token/src/lib.rs:247 (withdraw_xrd)",
+      "title": "Treasury withdrawal emits no event",
+      "what": "withdraw_xrd moves XRD out of the treasury but emits no event (unlike buy/burn/pause). BuyMemeEvent, BurnMemeEvent, PauseEvent exist; there is no WithdrawEvent.",
+      "why": "Off-chain treasury tracking + audit trails go blind on the single most sensitive money-moving admin action. Combined with F-001 (unbounded withdraw), an operator draining the treasury leaves no on-chain event for a watcher to alert on.",
+      "suggested_direction": "Emit a WithdrawXrdEvent { amount, remaining_treasury } so a keeper/indexer can alert on treasury movements.",
+      "confidence": "high",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "F-004",
+      "severity": "low",
+      "class": "Upgrade safety",
+      "location": "scrypto/meme-token/src/lib.rs:107 (MEME metadata icon_url, locked)",
+      "title": "All metadata locked — icon_url can never be repointed",
+      "what": "The MEME resource + component metadata are all `locked`, including icon_url => https://memegrid.radixguild.com/meme-icon.svg. Locked metadata is immutable for the life of the resource.",
+      "why": "If the icon host moves, the CDN path changes, or the domain lapses, the MEME token shows a broken icon in every wallet forever with no fix. Same class as the guild-escrow BUG-6. Name/symbol locked is correct (identity); icon_url + description locked is a foot-gun.",
+      "suggested_direction": "Grant a metadata_setter role to the owner badge for icon_url + description (keep name + symbol locked). Or host the icon on IPFS with an immutable CID so 'locked' is safe.",
+      "confidence": "high",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "F-005",
+      "severity": "low",
+      "class": "Integer / decimal arithmetic",
+      "location": "scrypto/meme-token/src/lib.rs:170 (buy_meme)",
+      "title": "Raw Decimal multiply in mint math",
+      "what": "meme_amount = xrd_amount * Decimal::from(MEME_PER_XRD) uses raw * (panic-on-overflow). MEME_PER_XRD is currently 1 and input is capped at MAX_XRD=10000, so overflow is not reachable today.",
+      "why": "Mitigated by the input cap + the 1:1 ratio, so low severity. Flagged for consistency: value math should use checked_mul so a future ratio change (constant edit) can't silently introduce an overflow-panic path.",
+      "suggested_direction": "Use xrd_amount.checked_mul(Decimal::from(MEME_PER_XRD)).expect(\"meme mint overflow\") to be robust against future ratio changes.",
+      "confidence": "medium",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "F-006",
+      "severity": "info",
+      "class": "State machine",
+      "location": "scrypto/meme-token/src/lib.rs:3-6, 31, 149 (doc vs constant mismatch)",
+      "title": "Doc comments say 1:100, code is 1:1",
+      "what": "The header doc (L6 'receive MEME at 1:100 ratio') and the buy_meme doc (L149 '1 XRD = 100 MEME') contradict the constant MEME_PER_XRD = 1 (L32, correctly commented '1 XRD = 1 MEME'). The .env/server also uses 1:1.",
+      "why": "Not a runtime bug — the constant governs behaviour, so it IS 1:1. But the contradictory docs will mislead anyone reasoning about pricing, and could cause a wrong 'fix' later. Documentation drift on the economic ratio is worth correcting before deploy.",
+      "suggested_direction": "Fix the two doc comments to say 1:1 (or change the constant if 1:100 was actually intended — but the server + .env assume 1:1, so fix the docs).",
+      "confidence": "high",
+      "status": "open",
+      "source": "llm"
+    }
+  ],
+  "checklist_coverage": [
+    { "class": "Auth bypass", "status": "findings", "findings": ["F-001"], "note": "Method auth is correct + least-privilege (buy/burn/views PUBLIC; set_paused/withdraw_xrd admin+OWNER; admin updatable_by OWNER). The issue is the UNBOUNDED scope of withdraw_xrd, not a missing gate." },
+    { "class": "Reentrancy", "status": "not_applicable", "note": "No external component calls. buy_meme puts XRD to vault before minting; no callback surface." },
+    { "class": "Integer / decimal arithmetic", "status": "findings", "findings": ["F-005"], "note": "Raw * in mint math (mitigated by MAX_XRD cap + 1:1 ratio). Decimal::try_from(MIN_XRD).unwrap() is on a compile-time constant — acceptable." },
+    { "class": "Resource handling", "status": "clean", "note": "Buckets are consumed (burn), returned (buy), or deposited (treasury). MEME divisibility MAXIMUM. No lost-bucket paths. No user-supplied NFT ids." },
+    { "class": "Time / epoch checks", "status": "not_applicable", "note": "No time-locked logic. Fixed price, no maturity, no epoch arithmetic." },
+    { "class": "State machine", "status": "findings", "findings": ["F-002", "F-003", "F-006"], "note": "paused flag correctly gates buy/burn. Findings are event-correctness (F-002 self-referential actor, F-003 missing withdraw event) + doc/constant drift (F-006), not state-integrity bugs." },
+    { "class": "External calls / composability", "status": "not_applicable", "note": "No external component invocations." },
+    { "class": "Upgrade safety", "status": "findings", "findings": ["F-004"], "note": "Not upgradeable (Fixed owner role) — no storage-collision risk. Finding is locked metadata (icon_url can't be repointed)." },
+    { "class": "Oracle / price dependence", "status": "not_applicable", "note": "No oracle. Price is a fixed constant (MEME_PER_XRD), not a market/pool read." },
+    { "class": "Slippage / MEV", "status": "not_applicable", "note": "No swaps/AMM. Fixed 1:1 mint. Treasury always holds ≥ the XRD paid for circulating MEME at mint price; no drain-by-arbitrage vector for a game token. See open_questions for the market-value note." },
+    { "class": "Approvals / allowances", "status": "clean", "note": "Owner badge is the only long-lived authorization; no Proofs handed to external components; no composed access rules. Owner-badge custody is the risk surfaced by F-001." }
+  ],
+  "pattern_conformance": [
+    { "pattern": "component-as-sole-minter (global_caller rule)", "present": "yes", "note": "MEME minter = require(global_caller(component_address)); minter_updater deny_all. Correct + immutable." },
+    { "pattern": "event per state change", "present": "partial", "note": "buy/burn/pause emit events; withdraw_xrd does not (F-003). Actor fields are self-referential (F-002)." },
+    { "pattern": "bounded admin money movement", "present": "no", "note": "withdraw_xrd is unbounded (F-001)." },
+    { "pattern": "updatable non-identity metadata", "present": "no", "note": "All metadata locked, including icon_url (F-004)." }
+  ],
+  "test_coverage_gaps": [
+    "withdraw_xrd: at-balance and over-balance withdrawal (asserts the Insufficient-treasury guard) + an auth-violation test (non-admin refused).",
+    "buy_meme: min-boundary (exactly 1 XRD), max-boundary (exactly 10000), over-max (10001 rejected), non-XRD token rejected, paused rejected.",
+    "burn_meme: zero-amount rejected, wrong-resource rejected, paused rejected.",
+    "Event attribution: assert what BuyMemeEvent.buyer actually contains (documents F-002 before it bites the indexer)."
+  ],
+  "open_questions": [
+    "F-002 is the highest-impact real bug: does the game server currently read the burner from the event (broken) or from the tx signer (correct)? If it reads the event, in-game credit attribution is broken the moment this deploys. Confirm before deploy.",
+    "F-001: is the owner badge intended to live in a hot server wallet or cold storage? For real player XRD, cold + Access Controller is strongly advised before mainnet.",
+    "Fixed-price mint: if MEME ever acquires secondary-market value != 1 XRD, is the 1:1 buy_meme intended to remain (treasury always backed at mint price) or should minting be capped/pausable against arbitrage? Likely fine for a test-mode game token; worth a conscious call before mainnet + before Phase-2 reward payouts inflate circulating supply.",
+    "This was a human-executed checklist pass. A CLI run of the kit against the exact source produces the attestable source_hash and confirms nothing was missed."
+  ]
+}

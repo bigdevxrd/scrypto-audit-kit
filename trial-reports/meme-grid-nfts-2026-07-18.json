@@ -1,0 +1,118 @@
+{
+  "schema_version": "1.0",
+  "kit": {
+    "version": "0.6.0",
+    "model": "anthropic/claude-opus-4-7",
+    "checklist_version": "1.0",
+    "reference_set": "manual-pass (VPS Claude, human-executed checklist walk)",
+    "generated_at": "2026-07-18"
+  },
+  "target": {
+    "repo": "github.com/bigdevxrd/meme-grid-game",
+    "package": "meme-grid-nfts (scrypto/meme-nfts/src/lib.rs — compile-only, NOT deployed)",
+    "files_analyzed": 1
+  },
+  "summary": {
+    "overall_risk": "high",
+    "one_liner": "Achievement-NFT minter. One design-breaking bug: the NFT local id is the achievement key, so any achievement can only be minted ONCE collection-wide — the second player to earn 'first_grid' panics. Delivery pattern (try_deposit_or_abort) is correct.",
+    "asset_inventory": [
+      "MemeGridNft string-id NFTs (achievement collection)",
+      "owner badge (full admin, cold)",
+      "minter badge (game server, hot — mints NFTs)"
+    ],
+    "trust_boundaries": [
+      "game server (holds minter badge, calls mint_nft / mint_nft_to)",
+      "owner (cold badge — can revoke/rotate minter, enable burn, update NFT data)",
+      "public (read-only views)"
+    ],
+    "external_dependencies": [
+      "Global<Account>::try_deposit_or_abort on the recipient account (mint_nft_to)"
+    ]
+  },
+  "findings": [
+    {
+      "id": "N-001",
+      "severity": "high",
+      "class": "Resource handling",
+      "location": "scrypto/meme-nfts/src/lib.rs:168 (mint_nft, NonFungibleLocalId::string(nft_id))",
+      "title": "NFT local id == achievement key → each achievement mintable only ONCE collection-wide",
+      "what": "mint_nft sets the NFT's NonFungibleLocalId to the caller-supplied nft_id, documented as 'the game achievement key (e.g. first_grid)'. Non-fungible local ids must be unique per resource. But the SAME achievement (e.g. 'first_grid') is earned by MANY players — so the id 'first_grid' can be minted exactly once across the entire collection. The 2nd player to unlock 'first_grid' triggers a duplicate-id mint, which PANICS (the resource manager rejects duplicate local ids). Additionally NonFungibleLocalId::string(nft_id).unwrap() panics on a malformed/oversized id (>64 bytes or invalid chars).",
+      "why": "This breaks the core use case: an achievement NFT collection where multiple players earn the same achievement. As written, only the first player ever gets each achievement NFT; everyone after fails. This will surface immediately in Phase 2 the moment two players earn the same achievement.",
+      "suggested_direction": "Make the local id unique per (player, achievement) — e.g. hash(account + game_key) or an auto-incrementing integer id, and keep game_key as a DATA field (it already is) for catalog linkage. Validate/parse the id with a non-panicking path (return an error or assert with a clear message) instead of .unwrap().",
+      "confidence": "high",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "N-002",
+      "severity": "medium",
+      "class": "State machine",
+      "location": "scrypto/meme-nfts/src/lib.rs:187 (MintNftEvent.recipient)",
+      "title": "MintNftEvent.recipient records the component's own address, not the player",
+      "what": "MintNftEvent.recipient = Runtime::global_component().address() — the component's own address, not the actual recipient. Same self-referential bug as MemeGameVault F-002. Note that mint_nft_to DOES know the real account (it's a parameter) but calls mint_nft internally, so the event still logs the component address even when the true recipient is known.",
+      "why": "Any indexer reading MintNftEvent.recipient to know who received an achievement NFT gets the component address every time — useless. mint_nft_to has the correct address available and should thread it into the event.",
+      "suggested_direction": "Thread the recipient through: have mint_nft_to pass the account into the event (or emit the event from mint_nft_to with the real account), and for the bare mint_nft path (caller deposits) either drop the recipient field or document that attribution is off-chain via the tx.",
+      "confidence": "high",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "N-003",
+      "severity": "low",
+      "class": "Approvals / allowances",
+      "location": "scrypto/meme-nfts/src/lib.rs:142 (minter role) + 118 (mint_roles)",
+      "title": "Unbounded minting authority on a hot minter badge",
+      "what": "The minter badge (held by the game server, described as hot / revocable) can mint unlimited NFTs with arbitrary data (name, rarity, icon_url all caller-supplied). No per-call limit, no rate limit, no allowlist of valid game_keys/rarities on-chain.",
+      "why": "A compromised minter badge can spam-mint arbitrary 'achievements' with any rarity/name, diluting/forging the collection. Mitigated by owner being able to rotate the minter (minter updatable_by OWNER) + revoke, but detection depends on off-chain monitoring. Same badge-custody class as MemeGameVault F-001.",
+      "suggested_direction": "Keep the minter badge tightly custodied (the server wallet). Consider an on-chain allowlist of valid game_keys/rarities, or move minting behind a bounded per-epoch cap, if the collection's integrity matters. At minimum, monitor MintNftEvent volume + alert on anomalies (once N-002 is fixed so events are attributable).",
+      "confidence": "medium",
+      "status": "open",
+      "source": "llm"
+    },
+    {
+      "id": "N-004",
+      "severity": "low",
+      "class": "Upgrade safety",
+      "location": "scrypto/meme-nfts/src/lib.rs:114 (collection icon_url, locked)",
+      "title": "Collection icon_url locked — can never be repointed",
+      "what": "The collection metadata icon_url => https://memegrid.radixguild.com/nfts/collection.svg is `locked`, immutable for the resource's life. (Per-NFT icon_url is a data field, updatable only if the owner later enables non_fungible_data_updater.)",
+      "why": "If the icon host moves or the domain lapses, the collection icon breaks in every wallet forever. Same class as MemeGameVault F-004 + guild-escrow BUG-6. Name/symbol locked is correct; icon_url locked is a foot-gun.",
+      "suggested_direction": "Grant a metadata_setter role (owner badge) for icon_url, or host on IPFS with an immutable CID so locked is safe.",
+      "confidence": "high",
+      "status": "open",
+      "source": "llm"
+    }
+  ],
+  "checklist_coverage": [
+    { "class": "Auth bypass", "status": "clean", "note": "get_* PUBLIC; mint_nft / mint_nft_to restrict_to [minter, OWNER]. minter updatable_by OWNER (equal-or-higher). mint_roles + burn_roles + data_update_roles all gate updaters behind the owner badge. Least-privilege + correct." },
+    { "class": "Reentrancy", "status": "clean", "note": "mint_nft_to makes ONE external call (account.try_deposit_or_abort) AFTER the mint + total_minted increment are complete — state finalised before the external call. No pre-mutation state exposed to a callback." },
+    { "class": "Integer / decimal arithmetic", "status": "not_applicable", "note": "No Decimal math. total_minted is a u64 counter (+= 1); overflow is unreachable in practice (would need 1.8e19 mints)." },
+    { "class": "Resource handling", "status": "findings", "findings": ["N-001"], "note": "The string-id-collision bug (N-001) is the central issue — user-supplied id + unwrap + per-achievement (not per-player) uniqueness. NFT bucket is returned (mint_nft) or deposited (mint_nft_to); no lost-bucket path." },
+    { "class": "Time / epoch checks", "status": "not_applicable", "note": "No time-locked logic." },
+    { "class": "State machine", "status": "findings", "findings": ["N-002"], "note": "No phases. Finding is event-correctness (self-referential recipient), not state integrity." },
+    { "class": "External calls / composability", "status": "clean", "note": "One external call — account.try_deposit_or_abort — is the CORRECT on-chain delivery pattern (atomic; aborts cleanly if the account deny-lists deposits). Contrast with the guild-escrow BUG-7 caller-manifest delivery gap; this blueprint does delivery right." },
+    { "class": "Upgrade safety", "status": "findings", "findings": ["N-004"], "note": "Not upgradeable (Fixed owner). NFT data non_fungible_data_updater = deny_all (updater_updater = owner), so achievements are immutable unless the owner later enables updates — reasonable. Finding is locked collection icon_url." },
+    { "class": "Oracle / price dependence", "status": "not_applicable", "note": "No oracle / price." },
+    { "class": "Slippage / MEV", "status": "not_applicable", "note": "No swaps / value trades." },
+    { "class": "Approvals / allowances", "status": "findings", "findings": ["N-003"], "note": "Minter badge = unbounded mint authority (N-003). Owner can rotate/revoke it (minter updatable_by OWNER) — a revoke path exists, which is good. Custody of the hot minter badge is the risk." }
+  ],
+  "pattern_conformance": [
+    { "pattern": "on-chain delivery via try_deposit_or_abort", "present": "yes", "note": "mint_nft_to deposits directly to the player account atomically — the correct pattern the guild escrow lacks. Strong." },
+    { "pattern": "revocable minter authority", "present": "yes", "note": "minter role updatable_by OWNER + mint_roles minter_updater = owner → owner can rotate/revoke the hot minter badge." },
+    { "pattern": "unique-by-construction NFT ids", "present": "no", "note": "id = achievement key → collides across players (N-001)." },
+    { "pattern": "non-panicking parse of external input", "present": "no", "note": "NonFungibleLocalId::string(nft_id).unwrap() (N-001)." },
+    { "pattern": "attributable events", "present": "no", "note": "MintNftEvent.recipient is self-referential (N-002)." }
+  ],
+  "test_coverage_gaps": [
+    "N-001 regression: two players earning the SAME achievement (same game_key) — asserts unique ids (currently panics on the 2nd).",
+    "mint_nft with an oversized / invalid nft_id string — asserts a clean error instead of an unwrap panic.",
+    "mint_nft_to to an account that rejects deposits — asserts the atomic abort (NFT not minted, no partial state).",
+    "auth: mint attempted without minter/owner badge — refused.",
+    "N-002: assert what MintNftEvent.recipient actually contains."
+  ],
+  "open_questions": [
+    "N-001 is the blocker: what is the intended NFT id scheme? If each (player, achievement) should be a distinct NFT, the id must incorporate the account (or be an auto-increment) — the achievement key alone cannot be the id. Confirm before deploy; the current scheme fails on the second earner of any achievement.",
+    "N-003: is on-chain rarity/game_key validation wanted, or is trusting the server-held minter badge acceptable for a game NFT? Likely acceptable at test scale; revisit if the NFTs acquire secondary-market value.",
+    "This was a human-executed checklist pass; a CLI run against the exact source yields the attestable source_hash."
+  ]
+}
