@@ -13,7 +13,7 @@ The free deterministic static tier (`--static-only`) uses **no** backend and nee
 
 | Backend | Select with | Needs | Use it for |
 |---|---|---|---|
-| **`claude-api`** (default) | *(nothing)* | the `anthropic` package + `ANTHROPIC_API_KEY` | The default. Talks to the Anthropic API directly (`bin/llm_audit.py`) — no aider, guaranteed-valid structured output, prompt caching. |
+| **`claude-api`** (default) | *(nothing)* | the `anthropic` package + `ANTHROPIC_API_KEY` | The default. Talks to the Anthropic API directly (`bin/llm_audit.py`) — no aider, prompt caching. Markdown + JSON-appendix output by default; opt in to guaranteed-valid structured output with `--structured`. |
 | **`aider`** | `--backend aider` | `aider` on PATH + a key | The original harness. Keeps the cross-model modes `--model deepseek` and `--model both`. |
 | **`cmd`** | `--backend cmd --backend-cmd '<command>'` | your command | Bring your own agent — point the kit at any program (your own agents, Claude Code, a script) that can read files and write a report. |
 
@@ -46,6 +46,37 @@ Prompt caching is on: the stable prefix (auditor prompt + checklist + reference 
 cached across runs, so subsequent audits in the same cache window are markedly cheaper — the
 cost figures in the [README](../README.md#cost) assume this. The target source and the per-run
 nonce are sent after the cache breakpoint, so they never invalidate the cached references.
+
+### `--structured` — opt-in, guaranteed-valid JSON (no markdown parse)
+
+By default `llm_audit.py` asks the model for a markdown report ending in a nonce-stamped JSON
+appendix, which `extract-report.py` then parses out. `--structured` skips that: it forces the
+report via a tool call (`tool_choice`), so the Anthropic API validates the JSON against a
+schema *before* returning it — no markdown, no parse step, no way for the model to hand back
+malformed JSON.
+
+```bash
+python3 bin/llm_audit.py --structured --model claude-sonnet-4-6 \
+    --prompt prompts/audit.md --pkg-root /path/to/pkg \
+    --read prompts/checklist.md --read references/*.md \
+    /path/to/pkg/Cargo.toml /path/to/pkg/src/lib.rs ...
+```
+
+The cached system prefix (auditor prompt + checklist + references) is byte-identical to
+markdown mode, so the two modes share the same cache — the tool-schema tokens are the only
+extra cost, offset by dropping the JSON appendix. `--structured` output is the
+model-authored report subset (`kit`/`target` are never in it — the harness stamps those); it
+prints straight to stdout as JSON.
+
+**Default is still markdown, and `--structured` is not yet wired into `audit.sh`.** Two
+reasons: the design calls for a parity check — run both modes on the same targets, diff the
+JSON, confirm they agree — before flipping the default, and that check needs API credits the
+kit doesn't have right now; and the full harness integration (branching `audit.sh` on the
+flag, stamping `kit`/`target` provenance onto the model subset, skipping
+`extract-report.py`'s markdown parse) is its own follow-up. For now, `--structured` is a
+tested, working building block at the `llm_audit.py` layer — call it directly (or via a
+script that also stamps provenance) if you want guaranteed-valid JSON today. See
+[the design doc](design/structured-output-mode-2026-07-18.md) for the full spec.
 
 ## `aider` — the original harness
 
