@@ -93,6 +93,14 @@ JSON appendix carrying a per-run nonce, so a malicious blueprint can't get the m
 forged report. The kit version, model, and source hash are authoritative because the harness
 writes them.
 
+The `claude-api` backend (`bin/llm_audit.py`) can produce that report two ways — markdown +
+nonce-stamped JSON appendix (default), or a forced tool call that the API validates
+server-side (`--structured`, opt-in; see [docs/backends.md](backends.md)). Both output
+contracts share one cached system prefix (auditor prompt + checklist + reference patterns),
+so switching modes doesn't cost a fresh cache fill. `--structured` isn't wired into `audit.sh`
+yet — it exists today as a tested `llm_audit.py`-layer building block, pending both a
+markdown-vs-structured parity check and the harness-integration follow-up.
+
 ## The L3 bridge
 
 `bin/attest.py` turns a `report.json` into an attestation payload (`source_hash`,

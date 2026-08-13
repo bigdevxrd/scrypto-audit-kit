@@ -4,6 +4,34 @@ Notable changes to scrypto-audit-kit. The kit version lives in [VERSION](VERSION
 stamped into every report; this log follows [Keep a Changelog](https://keepachangelog.com) and
 [SemVer](https://semver.org). The kit was built in a compressed timeline — dates reflect that.
 
+## [Unreleased]
+
+### Added
+
+- **`--structured` mode on the `claude-api` backend** ([bin/llm_audit.py](bin/llm_audit.py)).
+  Forces the pre-audit report via a tool call (`tool_choice`) instead of a markdown report +
+  JSON appendix, so the Anthropic API validates the JSON against a schema server-side before
+  returning it — no markdown, no parse step, no way for the model to hand back malformed
+  JSON. The tool's `input_schema` is derived at runtime from
+  [schema/audit-report.schema.json](schema/audit-report.schema.json) (single source of
+  truth), with `$ref`s to `$defs` inlined since intra-schema `$ref` support in tool
+  `input_schema` is unverified. Shares the cached system prefix with markdown mode, so
+  switching modes doesn't cost a fresh cache fill. Design:
+  [docs/design/structured-output-mode-2026-07-18.md](docs/design/structured-output-mode-2026-07-18.md)
+  (VPS-drafted 2026-07-18, implemented 2026-08-13).
+  - **Opt-in, default off.** The design calls for a markdown-vs-structured parity check
+    (run both modes on the same targets, diff the JSON) before flipping the default; that
+    check needs API credits the kit doesn't have right now, so it's deferred — see
+    [ROADMAP.md](ROADMAP.md).
+  - **Not yet wired into `audit.sh`.** This PR scopes the flag to the `llm_audit.py` layer
+    only (request assembly + tool-schema derivation + response handling, all unit-tested with
+    canned responses). Branching `audit.sh` on `--structured`, and stamping `kit`/`target`
+    provenance onto the model subset in place of `extract-report.py`'s markdown parse, is a
+    follow-up — `assemble_report()` is included as a tested building block for it.
+  - Docs: [docs/backends.md](docs/backends.md) `--structured` section,
+    [docs/architecture.md](docs/architecture.md) note on the two shared-cache output
+    contracts.
+
 ## [0.6.0] — 2026-07-17 — Interchangeable LLM backends
 
 The LLM pre-audit pass is no longer welded to aider. `audit.sh` now dispatches to a pluggable

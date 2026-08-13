@@ -16,8 +16,11 @@ Anything unchecked is fair game — open an issue to claim it.
 - [x] Deliberately-vulnerable example + committed sample report
 - [x] Reusable pre-audit GitHub Action + severity gate + badge ([docs/ci.md](docs/ci.md))
 - [x] VISION + this roadmap
-- [ ] First trial reports against public blueprints *(help wanted)*
-- [ ] Direct-API structured-output mode (guaranteed-valid JSON, no markdown parse)
+- [ ] First trial reports against public blueprints *(help wanted)* — also the parity check
+      (markdown vs. `--structured`) gating the default flip below
+- [x] Direct-API structured-output mode (guaranteed-valid JSON, no markdown parse) — `--structured`
+      on the `claude-api` backend, opt-in/default off; not yet wired into `audit.sh` — see
+      [docs/backends.md](docs/backends.md)
 
 ## Phase 2 — Agentic ✅ (v0.2)
 
