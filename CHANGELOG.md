@@ -35,7 +35,43 @@ attestation) is unchanged. See [docs/backends.md](docs/backends.md).
   (`unrecognized arguments: --temperature=0`) — it had broken the aider LLM path since v0.5.0's
   R5 pass. Removed; the aider backend runs again.
 
-Tests: 127 → 137 green.
+### Fixed
+
+- **`unsafe-block`** now also catches `unsafe fn` / `unsafe impl` (previously only matched
+  `unsafe { }`), and **`float-usage`**'s numeric-literal-suffix branch now catches exponent-form
+  floats (`1e5f64`, `1.5e3f32`).
+
+### Security
+
+A follow-up false-negative sweep of the analyzer itself (2026-07-18) — every finding reproduced
+against a crafted input with a passing control, not just read off the rules — found the issues
+below, fixed here:
+
+- **`merge_findings`** collapsed two distinct findings sharing a (class, title, severity)
+  signature into one whenever they sat at different lines. Among the static findings themselves
+  this silently dropped a real finding from every merged report — e.g. `raw-decimal-arith` at
+  `src/lib.rs:86` and `:98` in the vulnerable-vault fixture merged down to one — and was fixed
+  first. The LLM-vs-static half of the same merge had the identical bug and a second, sharper
+  edge: one LLM finding could swallow every static finding sharing its signature *anywhere in
+  the file*, not just its actual duplicate, and a model-marked `false_positive` could mask an
+  `open` deterministic static finding at the very same spot, silently overriding a reproducible
+  rule with a non-deterministic model opinion. Both halves are now location-aware the same way —
+  same signature AND same location is required to count as a duplicate — and a non-open primary
+  finding no longer suppresses a same-location extra.
+- **`raw-decimal-arith`** missed a rustfmt-wrapped Decimal `*`/`/` split across two lines
+  (operator leading the continuation line, ordinary rustfmt output for a long expression) — it
+  had been left on the old per-line scan when its siblings were migrated to a whole-text scan
+  specifically to defeat newline-splitting.
+- **`missing-method-auth`** — the kit's highest-severity rule — checked `enable_method_auth!`
+  against the *whole file* instead of each `#[blueprint]`'s own body, so pairing one authed
+  blueprint with one unauthed blueprint in the same `.rs` reported clean; the unauthed
+  blueprint's public methods were invisible to the rule. Now scoped per blueprint.
+- **`// sak:allow <rule>`** suppression trailing a line's own code was leaking onto the *next*
+  line — that next line's "line above" is the suppressed line, and nothing checked that a
+  "line above" was actually a dedicated comment line rather than code with its own inline
+  suppression. The "line above" form now only applies when that line carries no code of its own.
+
+Tests: 127 → 137 green (141 after the static-vs-static merge-fix; 154 after this pass).
 
 ## [0.5.0] — 2026-06-14 — Developer experience
 

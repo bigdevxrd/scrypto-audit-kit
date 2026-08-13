@@ -56,8 +56,9 @@ model / checklist version + a sha256 of the analyzed source).
   the merge and everything below it never change with the engine.
 - **Merge** — `sak_lib.merge_findings` appends the static findings the LLM didn't already
   raise (matched by a class+title+severity signature), so one report holds both, de-duplicated.
-  That LLM match is location-independent by design; among the static findings themselves the
-  dedup is location-aware, so two same-signature findings at different lines both survive.
+  The match against the LLM's findings is location-aware — same signature at the same line only
+  — and so is the dedup among the static findings themselves, so two same-signature findings at
+  different lines both survive, whichever side raised them.
 
 Why hybrid: determinism where you can get it (trust), an LLM where you can't (coverage). Each
 finding records which engine produced it (`source: static | llm`).

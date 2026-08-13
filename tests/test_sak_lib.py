@@ -99,14 +99,53 @@ class TestSakLib(unittest.TestCase):
         ]
         self.assertEqual(len(sak_lib.merge_findings([], extra)), 1)
 
-    def test_merge_llm_suppresses_static_regardless_of_line(self):
-        # the LLM's location-independent dedup is preserved: an LLM finding suppresses a static one
-        # that shares its signature even when the cited line differs by a line or two.
-        primary = [{"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:87", "source": "llm"}]
+    def test_merge_llm_suppresses_static_at_same_location(self):
+        # a genuine duplicate: the LLM and static pass cite the same signature at the same line
+        # — one entry (the LLM's), not two.
+        primary = [{"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:86", "source": "llm"}]
         extra = [{"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:86", "source": "static"}]
         merged = sak_lib.merge_findings(primary, extra)
         self.assertEqual(len(merged), 1)
         self.assertEqual(merged[0]["source"], "llm")
+
+    def test_merge_llm_does_not_suppress_static_at_different_location(self):
+        # BUG-HUNT-2026-07-18 M1: dedup against primary used to be location-INDEPENDENT (bare
+        # signature only), so an LLM finding at one line silently swallowed a static finding
+        # sharing its signature at a DIFFERENT line too — even a line or two apart. Now only a
+        # same-location match counts as "the same issue"; different lines both survive.
+        primary = [{"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:87", "source": "llm"}]
+        extra = [{"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:86", "source": "static"}]
+        merged = sak_lib.merge_findings(primary, extra)
+        self.assertEqual(len(merged), 2)
+        self.assertEqual({f["location"] for f in merged}, {"src/lib.rs:86", "src/lib.rs:87"})
+
+    def test_merge_llm_finding_does_not_swallow_distinct_static_at_other_line(self):
+        # The exact M1 reproduction: static finds raw-decimal-arith at :86 AND :98; the LLM pass
+        # reports one raw-arith finding at :86 sharing the signature. Only :86 is a true
+        # duplicate — :98 is a genuinely distinct footgun and must survive the merge (the old
+        # behavior dropped BOTH static entries, losing :98 entirely).
+        primary = [{"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:86", "source": "llm"}]
+        extra = [
+            {"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:86", "source": "static"},
+            {"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:98", "source": "static"},
+        ]
+        merged = sak_lib.merge_findings(primary, extra)
+        self.assertEqual(len(merged), 2)
+        self.assertEqual({f["location"] for f in merged}, {"src/lib.rs:86", "src/lib.rs:98"})
+
+    def test_merge_false_positive_primary_does_not_mask_open_extra(self):
+        # BUG-HUNT-2026-07-18 M1 "status-blind" facet: the LLM marks its finding false_positive
+        # at the same spot a static rule (deterministic, reproducible) still calls open. The
+        # merge must not let a non-deterministic model opinion silently erase the open static
+        # finding from a `status=open` view.
+        primary = [{"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:86",
+                    "source": "llm", "status": "false_positive"}]
+        extra = [{"class": "X", "title": "t", "severity": "medium", "location": "src/lib.rs:86",
+                  "source": "static", "status": "open"}]
+        merged = sak_lib.merge_findings(primary, extra)
+        self.assertEqual(len(merged), 2)
+        open_sources = {f["source"] for f in merged if f.get("status", "open") == "open"}
+        self.assertEqual(open_sources, {"static"})
 
     def test_full_merge_keeps_all_fixture_findings(self):
         # oracle: a full/merged run over the planted-bug fixture must surface all 5 static findings,
@@ -116,6 +155,24 @@ class TestSakLib(unittest.TestCase):
         merged = sak_lib.merge_findings([], static)  # empty LLM appendix — pure static-into-hybrid merge
         self.assertEqual(len(merged), 5)
         locs = {f["location"] for f in merged if f["rule"] == "raw-decimal-arith"}
+        self.assertEqual(locs, {"src/lib.rs:86", "src/lib.rs:98"})
+
+    def test_full_merge_with_llm_primary_keeps_distinct_static_raw_arith(self):
+        # M2: the fixture-oracle test above calls merge_findings([], static) — an EMPTY LLM
+        # primary — which can't exercise M1's bug (the drop only triggers when primary is
+        # non-empty and shares a static finding's signature). Reproduce the production shape
+        # against the real fixture: a non-empty LLM primary sharing its signature with the
+        # src/lib.rs:86 raw-arith finding must not also take out the distinct one at :98.
+        static = static_analysis.analyze_package(PKG)
+        raw_arith_86 = next(f for f in static
+                             if f["rule"] == "raw-decimal-arith" and f["location"] == "src/lib.rs:86")
+        llm_primary = [{
+            "class": raw_arith_86["class"], "title": raw_arith_86["title"],
+            "severity": raw_arith_86["severity"], "location": "src/lib.rs:86", "source": "llm",
+        }]
+        merged = sak_lib.merge_findings(llm_primary, static)
+        sig = sak_lib.finding_signature(raw_arith_86)
+        locs = {f["location"] for f in merged if sak_lib.finding_signature(f) == sig}
         self.assertEqual(locs, {"src/lib.rs:86", "src/lib.rs:98"})
 
     def test_read_source_span_marks_cited_line(self):
