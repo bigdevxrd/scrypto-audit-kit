@@ -216,11 +216,22 @@ def _finding_location(finding):
 
 
 def merge_findings(primary, extra):
-    """Append `extra` findings to `primary`, deduping in two deliberately different ways.
+    """Append `extra` findings to `primary`, deduping the same location-AWARE way on both sides.
 
-    Against `primary` (the LLM pass): skip an extra whose (class, title, severity) signature a
-    primary finding already carries — location-INDEPENDENT, because the LLM and static pass often
-    cite the same issue a line or two apart and we want one entry, not two (see finding_signature / R6).
+    Against `primary` (the LLM pass): skip an extra that shares BOTH signature (class, title,
+    severity) AND location with an OPEN primary finding — mirroring the extra-vs-extra keying
+    below. This used to be location-INDEPENDENT (bare signature only), on the theory that the
+    LLM and static pass often cite the same issue a line or two apart and we want one entry, not
+    two. In practice that let one LLM finding at one line swallow every static finding sharing
+    its signature ANYWHERE in the file — including genuinely distinct footguns at other lines,
+    e.g. `raw arithmetic` at :86 silently eating the unrelated one at :98
+    (BUG-HUNT-2026-07-18 M1). A pre-audit tool's worst failure mode is a false "all clear", so a
+    same-line match is required to treat the two as one issue; different lines now both survive.
+
+    A primary finding the model marked non-open (`status: false_positive`, `wontfix`, ...) does
+    NOT suppress a same-location extra, either: the static rule is deterministic, reproducible
+    ground truth, and a non-deterministic model opinion on that exact spot must not silently
+    erase it from a `status=open` view (the M1 write-up's "status-blind" facet).
 
     Among the `extra` findings themselves (the static pass): dedup is location-AWARE. Two static
     findings that share a signature but sit at different locations — e.g. `raw arithmetic` at
@@ -229,14 +240,17 @@ def merge_findings(primary, extra):
     old behavior) silently collapsed them into one.
 
     Returns a new list: primary order preserved, then the genuinely-new extras."""
-    primary_sigs = {finding_signature(f) for f in primary}
+    primary_open_keys = {
+        (finding_signature(f), _finding_location(f))
+        for f in primary
+        if str(f.get("status", "open")).lower() == "open"
+    }
     seen_extra = set()
     merged = list(primary)
     for f in extra:
-        sig = finding_signature(f)
-        if sig in primary_sigs:
+        key = (finding_signature(f), _finding_location(f))
+        if key in primary_open_keys:
             continue
-        key = (sig, _finding_location(f))
         if key in seen_extra:
             continue
         merged.append(f)

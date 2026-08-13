@@ -201,5 +201,73 @@ class TestEvasionsFixed(unittest.TestCase):
         self.assertEqual(fired("// see pool_rdx1qcdefghjkmnpqrstuvwxyz23456789"), set())
 
 
+class TestBugHunt20260718(unittest.TestCase):
+    """Regression tests for the 2026-07-18 bug-hunt findings (H1, H2, M3, L1, L3)."""
+
+    def test_raw_decimal_arith_rustfmt_wrapped_caught(self):
+        # H1: rustfmt wraps a long Decimal expression across two lines, operator leading the
+        # continuation line — the per-line regex saw neither operand+operator on any single line.
+        src = "let v = self.vault.amount()\n    * self.oracle.price;"
+        self.assertIn("raw-decimal-arith", {r for r, _ in fired(src)})
+
+    def test_raw_decimal_arith_rustfmt_wrapped_div_caught(self):
+        src = "let h = x\n    / dec!(2);"
+        self.assertIn("raw-decimal-arith", {r for r, _ in fired(src)})
+
+    def test_missing_method_auth_scoped_per_blueprint(self):
+        # H2: one blueprint carries enable_method_auth!, a second in the SAME file does not —
+        # the old whole-file check ("does the macro appear anywhere") let the first blueprint's
+        # macro vouch for the second blueprint's missing auth too. Must scope to each blueprint.
+        src = """#[blueprint]
+mod a {
+  enable_method_auth!{ methods { f => PUBLIC; } }
+  struct A {}
+  impl A { pub fn f(&self) {} }
+}
+#[blueprint]
+mod b {
+  struct B {}
+  impl B { pub fn drain(&mut self) {} }
+}
+"""
+        findings = fired(src)
+        auth_findings = [ln for r, ln in findings if r == "missing-method-auth"]
+        self.assertEqual(auth_findings, [7])  # only the second `#[blueprint]`, not the first
+
+    def test_missing_method_auth_both_blueprints_unauthed(self):
+        # both blueprints lacking the macro must each get their own finding, not just one.
+        src = ("#[blueprint]\nmod a {\n  impl A { pub fn f(&self) {} }\n}\n"
+               "#[blueprint]\nmod b {\n  impl B { pub fn g(&self) {} }\n}\n")
+        auth_findings = sorted(ln for r, ln in fired(src) if r == "missing-method-auth")
+        self.assertEqual(auth_findings, [1, 5])
+
+    def test_inline_suppress_does_not_leak_to_next_line(self):
+        # M3: an inline `// sak:allow` trailing line N's code was also silently suppressing a
+        # genuine, unrelated finding on line N+1 (whose "line above" happens to be line N, and
+        # the old check didn't require that "line above" to be a dedicated comment-only line).
+        src = "self.vault.take_all(); // sak:allow unbounded-take-all\nself.vault.take_all();"
+        self.assertEqual(fired(src), {("unbounded-take-all", 2)})
+
+    def test_standalone_suppress_comment_still_covers_next_line(self):
+        # the legitimate "line above" form — a dedicated comment line with no code of its own —
+        # must keep working.
+        src = "// sak:allow unbounded-take-all\nself.vault.take_all();\nself.vault.take_all();"
+        self.assertEqual(fired(src), {("unbounded-take-all", 3)})
+
+    def test_unsafe_fn_caught(self):
+        # L1: only `unsafe { ... }` fired; `unsafe fn` / `unsafe impl` did not, though the same
+        # "sidesteps the safety guarantees" rationale applies to both.
+        self.assertIn(("unsafe-block", 1), fired("pub unsafe fn raw(&self) {}"))
+
+    def test_unsafe_impl_caught(self):
+        self.assertIn(("unsafe-block", 1), fired("unsafe impl Send for V {}"))
+
+    def test_float_exponent_form_caught(self):
+        # L3: the numeric-literal-suffix branch had no exponent group, so `1e5f64` fell through
+        # both alternatives (the plain-suffix one requires `f32/64` directly after the digits).
+        self.assertIn(("float-usage", 1), fired("let x = 1e5f64;"))
+        self.assertIn(("float-usage", 1), fired("let y = 1.5e3f32;"))
+
+
 if __name__ == "__main__":
     unittest.main()

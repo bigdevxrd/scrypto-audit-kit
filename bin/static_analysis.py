@@ -156,9 +156,12 @@ def _f(line, rule_id, severity, klass, title, what, why, fix):
 @rule
 def r_float_usage(ctx):
     # Match f32/f64 as a type reference (preceded by a non-word char: `: f64`, `as f64`, `<f64>`)
-    # AND as a numeric-literal suffix (`0.05f64`, `3f32`, `1.5_f64`) — the leading `\b` in the old
-    # pattern skipped suffixed literals, since a digit before `f` is a word char (no boundary).
-    pat = re.compile(r"(?<![A-Za-z0-9_])f(?:32|64)\b|\b\d[\d_]*(?:\.\d[\d_]*)?f(?:32|64)\b")
+    # AND as a numeric-literal suffix (`0.05f64`, `3f32`, `1.5_f64`, and exponent form
+    # `1e5f64` / `1.5e3f32`) — the leading `\b` in the old pattern skipped suffixed literals,
+    # since a digit before `f` is a word char (no boundary); the exponent group was missing
+    # entirely, so `1e5f64` fell through both alternatives (BUG-HUNT-2026-07-18 L3).
+    pat = re.compile(r"(?<![A-Za-z0-9_])f(?:32|64)\b"
+                     r"|\b\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d[\d_]*)?f(?:32|64)\b")
     for lineno, line, _m in _matches(ctx["stripped_lines"], pat):
         yield _f(lineno, "float-usage", "high", "Integer / decimal arithmetic",
                  "floating-point type in financial code",
@@ -221,8 +224,11 @@ def r_self_updatable_role(ctx):
 
 @rule
 def r_unsafe_block(ctx):
-    # whole-text so `unsafe\n{` can't evade the line scan.
-    for lineno, line, _m in _finditer_lines(ctx["stripped"], r"\bunsafe\s*\{"):
+    # whole-text so `unsafe\n{` can't evade the line scan. Also catches `unsafe fn` / `unsafe
+    # impl` (BUG-HUNT-2026-07-18 L1) — the block-only pattern missed both, even though the same
+    # "sidesteps the safety guarantees" rationale applies to them.
+    pat = re.compile(r"\bunsafe\s*\{|\bunsafe\s+(?:fn|impl)\b")
+    for lineno, line, _m in _finditer_lines(ctx["stripped"], pat):
         yield _f(lineno, "unsafe-block", "medium", "Memory safety",
                  "unsafe block",
                  f"`{line.strip()[:80]}` uses an unsafe block.",
@@ -253,30 +259,63 @@ def r_todo_comment(ctx):
 
 
 _BLUEPRINT_RE = re.compile(r"#\[\s*(?:\w+::)*blueprint\s*\]")  # also matches #[scrypto::blueprint]
+_MOD_OPEN_RE = re.compile(r"\bmod\s+\w+\s*\{")
+
+
+def _brace_span_end(text, open_idx):
+    """Index just past the `}` matching the `{` at text[open_idx] (simple depth counter).
+
+    Safe to run on `ctx["stripped"]`: comments and string/char literals are already blanked
+    there, so a `{`/`}` inside either can never throw off the count. Returns len(text) if the
+    source never closes the brace (truncated/malformed input) — a defensive fallback, not the
+    expected case."""
+    depth = 0
+    for i in range(open_idx, len(text)):
+        c = text[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return len(text)
 
 
 @rule
 def r_missing_method_auth(ctx):
+    # Per-blueprint, not per-file (BUG-HUNT-2026-07-18 H2): the old check took only the FIRST
+    # #[blueprint] match and tested `"enable_method_auth!" in s` against the WHOLE file, so one
+    # authed blueprint silently vouched for every OTHER blueprint in the same .rs — a multi-
+    # blueprint file with one gated and one wide-open blueprint reported clean.
     s = ctx["stripped"]
-    match = _BLUEPRINT_RE.search(s)
-    if not match or "enable_method_auth!" in s:
-        return
-    if not re.search(r"\bpub\s+fn\b", s):
-        return
-    yield _f(_line_of(s, match.start()), "missing-method-auth", "high", "Auth bypass",
-             "blueprint has no enable_method_auth!",
-             "a #[blueprint] with public methods declares no enable_method_auth! macro.",
-             "Without it every public method is callable by anyone — there is no role gating at all.",
-             "Add enable_method_auth! and restrict state-changing methods to the least-privileged role.")
+    for bp_match in _BLUEPRINT_RE.finditer(s):
+        mod_match = _MOD_OPEN_RE.search(s, bp_match.end())
+        if not mod_match:
+            continue  # no `mod X { ... }` found after the attribute — malformed/truncated input
+        body_end = _brace_span_end(s, mod_match.end() - 1)
+        body = s[mod_match.start():body_end]
+        if "enable_method_auth!" in body:
+            continue
+        if not re.search(r"\bpub\s+fn\b", body):
+            continue
+        yield _f(_line_of(s, bp_match.start()), "missing-method-auth", "high", "Auth bypass",
+                 "blueprint has no enable_method_auth!",
+                 "a #[blueprint] with public methods declares no enable_method_auth! macro.",
+                 "Without it every public method is callable by anyone — there is no role gating at all.",
+                 "Add enable_method_auth! and restrict state-changing methods to the least-privileged role.")
 
 
 @rule
 def r_raw_decimal_arith(ctx):
     # raw * and / on a Decimal amount panic on overflow (and / panics on a zero divisor).
     # High-precision: only fire when an `.amount()` or `dec!(...)` operand sits next to the operator.
+    # Whole-text (BUG-HUNT-2026-07-18 H1): this rule still used the per-line `_matches` helper
+    # after its siblings were migrated to `_finditer_lines` (commit af17dc0) specifically to
+    # defeat newline-splitting, so ordinary rustfmt wrapping of a long expression — operator
+    # leading the continuation line — evaded it (`\s*` in the pattern spans the newline here).
     pat = re.compile(r"(?:\.amount\s*\(\s*\)|\bdec!\s*\([^)]*\))\s*[*/]"
                      r"|[*/]\s*(?:[\w.]*\.amount\s*\(\s*\)|dec!\s*\()")
-    for lineno, line, _m in _matches(ctx["stripped_lines"], pat):
+    for lineno, line, _m in _finditer_lines(ctx["stripped"], pat):
         yield _f(lineno, "raw-decimal-arith", "medium", "Integer / decimal arithmetic",
                  "raw arithmetic on a Decimal amount",
                  f"`{line.strip()[:80]}` uses raw * or / on a Decimal amount.",
@@ -311,18 +350,28 @@ def r_public_mint_burn(ctx):
 _SUPPRESS_RE = re.compile(r"//\s*sak:allow\s+([\w-]+)")
 
 
-def _suppressed(comment_lines, line, rule_id):
-    """True if `// sak:allow <rule-id>` is on this line or the line above (1-indexed). Operates on
+def _suppressed(comment_lines, code_lines, line, rule_id):
+    """True if `// sak:allow <rule-id>` is on this line (1-indexed) or the line above. Operates on
     the comments-visible view, so a token inside a string literal does not suppress.
+
+    The "line above" form is honored ONLY when that line carries no code of its own — checked
+    against `code_lines` (the comment-blanked view), i.e. it is a dedicated suppression-comment
+    line (BUG-HUNT-2026-07-18 M3). Without that check, an INLINE suppression trailing line N's
+    code also leaked onto line N+1: line N+1's "line above" is line N, and line N carries a
+    `// sak:allow` even though it was only ever meant to cover its own line.
 
     A specific rule id is REQUIRED — the blanket `// sak:allow all` is rejected. The suppression
     lives in source authored by the party under audit, so a blanket "hide everything" is a hole:
     each suppression must name its rule and is then visible per-line in review/diff."""
-    for candidate in (line, line - 1):
-        if 1 <= candidate <= len(comment_lines):
-            m = _SUPPRESS_RE.search(comment_lines[candidate - 1])
-            if m and m.group(1) == rule_id:
-                return True
+    if 1 <= line <= len(comment_lines):
+        m = _SUPPRESS_RE.search(comment_lines[line - 1])
+        if m and m.group(1) == rule_id:
+            return True
+    above = line - 1
+    if 1 <= above <= len(comment_lines) and 1 <= above <= len(code_lines) and not code_lines[above - 1].strip():
+        m = _SUPPRESS_RE.search(comment_lines[above - 1])
+        if m and m.group(1) == rule_id:
+            return True
     return False
 
 
@@ -341,7 +390,7 @@ def analyze_text(rel_path, src):
     found = []
     for fn in RULES:
         for item in fn(ctx):
-            if _suppressed(ctx["comments_lines"], item["line"], item["rule"]):
+            if _suppressed(ctx["comments_lines"], ctx["stripped_lines"], item["line"], item["rule"]):
                 continue
             item["rel_path"] = rel_path
             found.append(item)
