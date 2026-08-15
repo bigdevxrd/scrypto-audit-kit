@@ -84,11 +84,18 @@ release was built by this repo's `release.yml` and not uploaded by someone holdi
 token. This has been true since v0.5.0 and was simply never documented — an unverifiable
 signature helps nobody.
 
+These attestations live on **PyPI**, not in GitHub's attestation store — `gh attestation verify`
+looks in the latter and returns a 404 for them. Read them from PyPI's integrity API:
+
 ```bash
-pip download --no-deps scrypto-audit-kit==<version>
-gh attestation verify scrypto_audit_kit-<version>-py3-none-any.whl --repo bigdevxrd/scrypto-audit-kit
+curl -s https://pypi.org/integrity/scrypto-audit-kit/<version>/scrypto_audit_kit-<version>-py3-none-any.whl/provenance \
+  | python3 -c "import json,sys; b=json.load(sys.stdin)['attestation_bundles'][0]['publisher']; print(b['kind'], b['repository'], b['workflow'])"
 ```
 
-PyPI also shows the attestation on each file's page under **Provenance**. For a security tool
-this is the point: "pin by tag" and "install from PyPI" are only supply-chain advice if the
-artifact's origin can actually be checked.
+which for a genuine release prints `GitHub bigdevxrd/scrypto-audit-kit release.yml`. PyPI also
+shows it on each file's page under **Provenance**, and the
+[`pypi-attestations`](https://pypi.org/project/pypi-attestations/) CLI verifies the signature
+itself rather than just reading the claim.
+
+For a security tool this is the point: "pin by tag" and "install from PyPI" are only supply-chain
+advice if the artifact's origin can actually be checked.
