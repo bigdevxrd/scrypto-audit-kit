@@ -10,7 +10,7 @@ on:
         required: true
         type: string
       model:
-        description: "claude | deepseek | both"
+        description: "claude — the only value CI can authenticate. deepseek | both are aider cross-model modes that also need a DEEPSEEK_API_KEY, and this workflow forwards no such secret, so they fail here; they work locally (docs/backends.md)."
         required: false
         default: claude
         type: string
@@ -20,7 +20,7 @@ on:
         default: high
         type: string
       kit-ref:
-        description: "scrypto-audit-kit ref to pin (tag/branch/sha)."
+        description: "scrypto-audit-kit ref to pin (tag/branch/sha). Defaults to main — pin it to the same release as the `uses:` ref, or the audit code moves under you. Floor is v0.7.0, matching the `uses:` ref: v0.6.0 defaults to the claude-api backend and v0.5.0 has no [llm] extra at all, so on either the backend install step below fails the job rather than letting it die mid-audit."
         required: false
         default: main
         type: string
@@ -39,14 +39,19 @@ jobs:
       - name: Check out the project under audit
         uses: actions/checkout@v4
         with:
-          # The audit compiles this (untrusted) tree, executing its build.rs — do NOT leave the
-          # GITHUB_TOKEN in .git/config where a build script could read it.
+          # The audit reads this (untrusted) tree, it does not build it: audit.sh's compile
+          # check is opt-in and this workflow never passes --compile-check. Drop the token
+          # regardless — nothing downstream needs it, and it keeps the GITHUB_TOKEN out of
+          # .git/config where a build script could read it if a run ever does compile.
           persist-credentials: false
 
       - name: Check out scrypto-audit-kit
         uses: actions/checkout@v4
         with:
           repository: bigdevxrd/scrypto-audit-kit
+          # Caller-controlled, but this is an action input, not a run script: the runner hands
+          # the value to checkout's JS, which execs git with an argv array — no shell parses
+          # it, so unlike the run: steps below it needs no env binding.
           ref: ${{ inputs.kit-ref }}
           path: .scrypto-audit-kit
           persist-credentials: false
@@ -58,13 +63,42 @@ jobs:
       - name: Add wasm target
         run: rustup target add wasm32-unknown-unknown
 
+      - name: Install the audit backend
+        # audit.sh defaults to the claude-api backend, which imports `anthropic`
+        # (bin/llm_audit.py). Its pre-flight only checks that python3 exists, so a missing
+        # `anthropic` gets past it and the job dies mid-run at the import — install the kit's
+        # [llm] extra here so the default path actually runs.
+        env:
+          KIT_REF: ${{ inputs.kit-ref }}
+        run: |
+          pip install "./.scrypto-audit-kit[llm]"
+          # The extra only exists from v0.6.0 on. Against an older kit-ref pip does NOT fail —
+          # it prints "WARNING: scrypto-audit-kit X does not provide the extra 'llm'", installs
+          # without `anthropic`, and exits 0. Assert the import here, where the message can name
+          # the cause, instead of letting the job go green and die later at llm_audit.py's import.
+          if ! python3 -c 'import anthropic' 2>/dev/null; then
+            echo "::error::the claude-api backend needs the 'anthropic' package and it is not installed."
+            echo "kit-ref '$KIT_REF' has no [llm] extra (added in v0.6.0), so pip only warned and skipped it."
+            echo "Pin kit-ref to v0.7.0 or later, or install anthropic yourself before this workflow runs."
+            exit 1
+          fi
+
       - name: Install aider
+        # Only the cross-model modes need it: model: deepseek|both switch audit.sh to the
+        # aider backend, which wants aider on PATH. The default (claude) never calls aider,
+        # so don't pay for the install on every run.
+        if: inputs.model == 'deepseek' || inputs.model == 'both'
         run: pipx install aider-chat
 
       - name: Run pre-audit
+        # Bind the caller's inputs to env vars and quote the variables — never interpolate
+        # ${{ inputs.* }} into a run script (GitHub substitutes the value before bash sees the
+        # line, so a crafted input executes in this job, which has ANTHROPIC_API_KEY in env).
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: .scrypto-audit-kit/audit.sh --model "${{ inputs.model }}" "${{ inputs.package }}"
+          MODEL: ${{ inputs.model }}
+          PACKAGE: ${{ inputs.package }}
+        run: .scrypto-audit-kit/audit.sh --model "$MODEL" "$PACKAGE"
 
       - name: Upload report
         if: always()
@@ -75,4 +109,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Gate on severity
-        run: python3 .scrypto-audit-kit/bin/ci-gate.py --reports .scrypto-audit-kit/audit-reports --fail-on "${{ inputs.fail-on }}"
+        # Same rule as the audit step: the input goes through env, never into the run line.
+        env:
+          FAIL_ON: ${{ inputs.fail-on }}
+        run: python3 .scrypto-audit-kit/bin/ci-gate.py --reports .scrypto-audit-kit/audit-reports --fail-on "$FAIL_ON"
