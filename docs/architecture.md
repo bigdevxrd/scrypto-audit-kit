@@ -103,11 +103,15 @@ markdown-vs-structured parity check and the harness-integration follow-up.
 
 ## The L3 bridge
 
-`bin/attest.py` turns a `report.json` into an attestation payload (`source_hash`,
-`report_hash`, `wasm_hash`, versions, level, severity counts) and a Radix transaction manifest
-that calls `attest()` on the [attestation registry blueprint](../attestation/). The minted
-record is **soulbound** and binds *this exact code hash* to *this coverage level* — a coverage
-claim anyone can verify on-ledger, never a safety blessing.
+`bin/attest.py` turns a `report.json` into an attestation payload (`source_hash`, `report_hash`,
+`wasm_hash`, versions, `mode`, severity counts) and a Radix transaction manifest that calls
+`attest()` on the [attestation registry blueprint](../attestation/). The minted record is
+**soulbound** and binds *this exact code hash* to *what one run reported* — a coverage claim
+anyone can verify on-ledger, never a safety blessing.
+
+The record carries **facts, not a trust level**: `mode` (`static` | `llm` | `hybrid`) says which
+tiers ran, enum-checked on-chain. The L1/L2/L3 rung is derived by the reader — see
+[attestation-levels.md](attestation-levels.md) for why, and for the rule.
 
 ## Invariants
 

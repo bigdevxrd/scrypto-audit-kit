@@ -88,14 +88,15 @@
       "type": "object",
       "description": "The AttestationInput the registry's attest() expects. Counts are clamped to u16.",
       "additionalProperties": false,
-      "required": ["source_hash", "report_hash", "wasm_hash", "kit_version", "checklist_version", "level", "critical", "high", "medium", "low", "info"],
+      "required": ["source_hash", "report_hash", "wasm_hash", "kit_version", "checklist_version", "mode", "static_ruleset_version", "critical", "high", "medium", "low", "info"],
       "properties": {
         "source_hash": { "type": "string", "description": "sha256 of the analyzed source — the deterministic anchor" },
         "report_hash": { "type": "string", "description": "sha256 of the report.json — a fingerprint, not re-derivable for the LLM tier" },
         "wasm_hash": { "type": "string", "description": "sha256 of the built blueprint wasm, or empty" },
         "kit_version": { "type": "string" },
         "checklist_version": { "type": "string" },
-        "level": { "type": "string", "description": "L1-static | L2-hybrid | ..." },
+        "mode": { "type": "string", "enum": ["static", "llm", "hybrid"], "description": "which analysis tiers ran — a fact, not a trust level. The L1/L2/L3 rung is derived by the reader (docs/attestation-levels.md)" },
+        "static_ruleset_version": { "type": "string", "description": "version of the deterministic ruleset that ran" },
         "critical": { "type": "integer", "minimum": 0, "maximum": 65535 },
         "high": { "type": "integer", "minimum": 0, "maximum": 65535 },
         "medium": { "type": "integer", "minimum": 0, "maximum": 65535 },
@@ -228,7 +229,7 @@
     },
     {
       "name": "attestation_payload",
-      "description": "Bridge a report.json to the L3 attestation registry: hashes, severity counts, level, and (with component + account) a Radix transaction manifest calling attest() — free, no API.",
+      "description": "Bridge a report.json to the attestation registry: hashes, severity counts, the mode that ran, and (with component + account) a Radix transaction manifest calling attest() — free, no API. Refuses a report with no source_hash anchor.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
@@ -237,8 +238,7 @@
           "report_path": { "type": "string" },
           "component": { "type": "string", "description": "deployed registry component address (for the manifest)" },
           "account": { "type": "string", "description": "your account address (for the manifest)" },
-          "wasm_path": { "type": "string", "description": "optional path to the built blueprint wasm to hash" },
-          "level": { "type": "string", "description": "optional override for the derived level" }
+          "wasm_path": { "type": "string", "description": "optional path to the built blueprint wasm to hash" }
         }
       },
       "outputSchema": { "$ref": "#/$defs/attestationResult" }

@@ -245,6 +245,8 @@ fi
 CHECKLIST_VERSION="$(sed -n 's/.*checklist-version:[[:space:]]*\([0-9.]*\).*/\1/p' \
   "$KIT_DIR/prompts/checklist.md" 2>/dev/null | head -1)" || CHECKLIST_VERSION=""
 CHECKLIST_VERSION="${CHECKLIST_VERSION:-unknown}"
+# Version of the deterministic ruleset — read from the analyzer so the two can never drift.
+STATIC_RULESET_VERSION="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import static_analysis; print(static_analysis.STATIC_RULESET_VERSION)' "$KIT_DIR/bin" 2>/dev/null || echo unknown)"
 # sha256 of the concatenated analyzed source — the anchor an attestation binds to.
 if command -v sha256sum >/dev/null 2>&1; then
   SOURCE_HASH="$(cat "${TARGET_FILES[@]}" 2>/dev/null | sha256sum | cut -d' ' -f1)" || SOURCE_HASH=""
@@ -511,6 +513,7 @@ if command -v python3 >/dev/null 2>&1; then
     --repo "$REPO" --package "$PKG" --source-hash "$SOURCE_HASH" \
     --files "${#TARGET_FILES[@]}" --generated-at "$DATE" \
     --static-json "$STATIC_FINDINGS" --nonce "$NONCE" \
+    --static-ruleset-version "$STATIC_RULESET_VERSION" \
     --schema "$KIT_DIR/schema/audit-report.schema.json" \
     || extract_rc=$?
   # exit 3 = the JSON appendix failed nonce authentication (possible injection). Do NOT swallow

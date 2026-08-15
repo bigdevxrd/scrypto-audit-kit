@@ -1,8 +1,15 @@
 # Running the pre-audit in CI (and the badge)
 
 Wire `scrypto-audit-kit` into your repo's CI so every PR gets a pre-audit, and
-display a badge that reflects the result. This is **rung L2** of the [trust
-ladder](../VISION.md) — an attested, version-pinned run (deterministic static tier) rather than a one-off.
+display a badge that reflects the result. This is the **path to rung L2** of the [trust ladder](../VISION.md) — a pinned,
+version-controlled run on an independent runner rather than a one-off on someone's laptop.
+
+Note what a green badge does and does not establish: it shows a run happened and passed your
+threshold. **L2 proper requires the run's provenance to be signed** by the build platform, so a
+reader can verify it was not produced by the claimant. Until the kit emits an OIDC-signed
+statement (tracked on the [roadmap](../ROADMAP.md)), treat CI runs as L1 with a strong audit
+trail, and see [attestation-levels.md](attestation-levels.md) for what each rung actually
+requires.
 
 ## 1. Add the workflow
 
@@ -74,8 +81,8 @@ Once the workflow has run at least once, add its status badge to your README
 ```
 
 The badge is green when the latest run found nothing at or above your `fail-on`
-threshold, red otherwise. It is an **honest** signal — it says "the pre-audit
-passed at level L2", not "this code is safe". It does not replace a human audit
+threshold, red otherwise. It is an **honest** signal — it says "the pre-audit ran and passed
+this threshold", not "this code is safe" and not "this run's provenance is signed". It does not replace a human audit
 ([what the kit is and isn't](../README.md#limitations--read-this-before-relying-on-the-output)).
 
 Two honesty caveats: (1) the pass/fail can **vary between runs** on identical code, because the

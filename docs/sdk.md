@@ -73,7 +73,7 @@ Pure, stdlib-only helpers over a report dict (or a findings list):
 ```python
 from scrypto_audit_kit import sak_lib
 
-report  = sak_lib.build_report(findings)                # assemble a schema-shaped report
+report  = sak_lib.build_report(findings, "path/to/package")  # schema-valid + provenance-stamped
 verdict = sak_lib.gate_verdict(report, fail_on="high")  # {passed, worst, counts, total, fail_on}
 
 base = sak_lib.load_report("baseline.json")
@@ -108,13 +108,23 @@ your package — you do, then remove the `#[ignore]` and fill in each `todo!()`.
 ```python
 from scrypto_audit_kit import attest
 
-payload  = attest.build_payload("report.json")          # source/report/wasm hashes + counts + level
+payload  = attest.build_payload("report.json")      # hashes + counts + the mode that ran
 manifest = attest.render_manifest(payload, component="component_rdx1...", account="account_rdx1...")
 ```
 
-`build_payload` computes the hashes, severity counts, and derived level; `render_manifest`
-renders the Radix transaction manifest that records the attestation. See
+`build_payload` computes the hashes, severity counts, and `mode` (`static` | `llm` | `hybrid`);
+`render_manifest` renders the Radix transaction manifest. See
 [the attestation blueprint](../attestation/).
+
+Two things worth knowing:
+
+- **`mode` is a fact, not a trust level.** It says what analysis ran. The L1/L2/L3 rung is yours
+  to compute from mode + who attested + `issuer_verified` — the rule is published in
+  [attestation-levels.md](attestation-levels.md). No level is recorded on-chain.
+- **It refuses rather than guessing.** `build_payload` raises `attest.AttestationError` if the
+  report has no `source_hash` anchor or no `kit.version`. Pass the package dir to `build_report`
+  (above) and the anchor is stamped for you; without it there is nothing for an attestation to
+  bind to, and the on-chain call would revert *after* locking your fee.
 
 ## The 9 tools, in-process
 

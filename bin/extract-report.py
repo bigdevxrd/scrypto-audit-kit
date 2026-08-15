@@ -114,6 +114,8 @@ def main():
     ap.add_argument("--kit-version", default="unknown")
     ap.add_argument("--model", default="unknown")
     ap.add_argument("--checklist-version", default="unknown")
+    ap.add_argument("--static-ruleset-version", default="",
+                    help="version of the deterministic ruleset that ran (stamped when static ran)")
     ap.add_argument("--reference-set", default="")
     ap.add_argument("--repo", default="")
     ap.add_argument("--package", default="")
@@ -177,12 +179,24 @@ def main():
     # Stamp authoritative provenance — overrides whatever the model put there.
     obj["schema_version"] = "1.0"
     kit = obj.setdefault("kit", {})
+    # Which tiers actually ran, recorded as a fact. This is the ONLY thing attest.py may derive
+    # its mode from; it used to parse the free-text model string, which meant an unknown or
+    # user-supplied model asserted that the LLM pass had run. `static_ran` and `span is not None`
+    # are the two authoritative signals and we already hold both here.
+    tiers = []
+    if static_ran:
+        tiers.append(sak_lib.TIER_STATIC)
+    if span is not None:
+        tiers.append(sak_lib.TIER_LLM)
     kit.update({
         "version": args.kit_version,
         "model": args.model,
+        "tiers": tiers,
         "checklist_version": args.checklist_version,
         "generated_at": args.generated_at,
     })
+    if static_ran and args.static_ruleset_version:
+        kit["static_ruleset_version"] = args.static_ruleset_version
     if args.reference_set:
         kit["reference_set"] = args.reference_set
     target = obj.setdefault("target", {})

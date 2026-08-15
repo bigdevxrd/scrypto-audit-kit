@@ -13,6 +13,45 @@ for CI callers.**
 
 ### Fixed
 
+- **Attestations recorded a trust level they could not justify — now they record facts**
+  ([bin/attest.py](bin/attest.py), [attestation/src/lib.rs](attestation/src/lib.rs),
+  [docs/attestation-levels.md](docs/attestation-levels.md)) — **high, and a breaking change to
+  the attestation payload and the blueprint.** The `level` field conflated two different axes.
+  [VISION.md](VISION.md) defines L1/L2/L3 by *who witnessed a run* (L2 = attested CI run);
+  `attest.py` emitted `L1-static`/`L2-hybrid` by *which tiers ran*. So a laptop run stamped
+  `L2-hybrid`, and a reader who learned the ladder from our own docs read that as an attested
+  CI run. Three consequences, all now closed:
+  - **It failed upward.** The level came from parsing the free-text `kit.model` for the substring
+    `static-only`, returning the *higher* claim on anything else — so an absent, unknown, or
+    user-supplied model asserted that the LLM checklist pass had run. `--no-static` (no
+    deterministic tier at all) also derived "hybrid".
+  - **The level was forgeable and self-referential.** `--level` passed any string straight
+    through to the chain, and `attest()` never validated it. `"L3-attested"` as an *input* is
+    circular — L3 *is* the record existing. The test asserting that override worked was a
+    regression test **for** the forgery path; it is now a test that no level field exists.
+  - **The documented pip-only path produced an unattestable payload.** `sak_lib.build_report`
+    emitted `kit: {}, target: {}` — schema-*invalid*, with an empty `source_hash` — which
+    [docs/sdk.md](docs/sdk.md) presented as the finished product.
+
+  Now: the payload carries **`mode`** (`static` | `llm` | `hybrid`) plus `static_ruleset_version`,
+  derived only from the new `kit.tiers` fact and requiring positive evidence to climb — absent
+  tiers derive the *lowest* claim. `mode` is enum-checked on-chain so garbage is unrepresentable,
+  and `level` is gone from `AttestationInput`, `AttestationData` and the event. The L1/L2/L3 rung
+  is computed by the reader from mode + attester identity + `issuer_verified`, under a published,
+  versioned rule ([docs/attestation-levels.md](docs/attestation-levels.md)). This is the split
+  [SLSA](https://slsa.dev) makes for the same reason: a producer asserting its own trust level is
+  worth nothing.
+
+  `build_payload` now **refuses** — raising `attest.AttestationError` — on a missing `source_hash`
+  or `kit.version`, instead of emitting a payload the chain rejects *after* `lock_fee`. The
+  artifact is permanent and unburnable; an over-claim is not a bad log line, it is an immutable
+  one. `sak_lib.build_report(findings, pkg_dir)` stamps real provenance so the pip path produces
+  something attestable, and `sak_lib.source_hash()` gives the SDK the anchor computation that
+  previously existed only in shell — pinned byte-for-byte against `audit.sh` by a parity test.
+
+  **The blueprint change is free only until first deploy.** The registry has never been deployed,
+  so no on-chain record is invalidated. This window closes permanently at the first Stokenet
+  deploy, which is why it is being taken now.
 - **Code execution in the pre-audit job, one step before your API key enters it**
   ([.github/workflows/pre-audit.yml](.github/workflows/pre-audit.yml)) — **critical**. The
   backend-install step ran `python3 -c 'import anthropic'` with the *audited* repository as its
@@ -90,7 +129,7 @@ a published tool contract; its docstrings now say so).
   died immediately, and after that 27 tests failed on absent fixtures. Downstream packagers
   (conda-forge, Debian, Nix, corporate mirrors) build from the sdist by convention, and for a
   security tool it is also how someone verifies from source that the artifact matches the repo.
-  The sdist now runs its full 211-test suite green.
+  The sdist now runs its full 221-test suite green.
 - **The `[mcp]` and `[dev]` extras are installable on the Python version we claim to support**
   ([pyproject.toml](pyproject.toml)) — **high**. Every published `mcp` release requires 3.10+,
   but `requires-python` is `>=3.8` and the wheel is `py3-none-any`, so pip served it to 3.8/3.9
@@ -115,7 +154,11 @@ a published tool contract; its docstrings now say so).
 - Import-hygiene regression tests ([tests/test_import_hygiene.py](tests/test_import_hygiene.py)) —
   6 cases that synthesize a consuming application owning modules named like ours and assert, in a
   subprocess, that importing the kit neither mutates `sys.path` nor shadows them, while the kit
-  still resolves its own. 4 of the 6 fail against v0.7.0. **211 tests total.**
+  still resolves its own. 4 of the 6 fail against v0.7.0.
+- Attestation-honesty tests ([tests/test_attest.py](tests/test_attest.py)) — fail-low derivation
+  on absent/junk tiers, refusal on a missing anchor, the absence of any `level` field, and a
+  parity test running the real `audit.sh` hashing pipeline against `sak_lib.source_hash` on two
+  packages, so the shell and Python anchors can never drift. **221 tests total.**
 
 ## [0.7.0] — 2026-08-15 — CI hardening and rule precision
 

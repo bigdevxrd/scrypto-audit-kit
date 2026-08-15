@@ -119,6 +119,13 @@ def _line_of(text, offset):
 
 # --------------------------------------------------------------------------- rules
 
+# Version of the deterministic ruleset, stamped into report provenance and into on-chain
+# attestations. Bump it whenever a rule is added, removed, or changes what it fires on: the
+# static tier is the reproducible half of a report, and "reproducible" is meaningless unless a
+# verifier can tell WHICH ruleset to re-run. Independent of the kit version, which moves for
+# reasons that do not affect findings.
+STATIC_RULESET_VERSION = "1.0"
+
 RULES = []
 
 
