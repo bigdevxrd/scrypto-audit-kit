@@ -27,6 +27,15 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      # The `mcp[cli]<2` bound is load-bearing, not staleness: mcp 2.0.0 removed
+      # `mcp.server.fastmcp`, which bin/mcp_server.py imports, so widening it silently breaks
+      # `sak-mcp` for everyone who installs the [mcp] extra. Dependabot proposed exactly that
+      # within minutes of being enabled. Lifting the bound requires PORTING the server to the
+      # 2.x entry point first — a code change, not a metadata bump — so major bumps of this
+      # dependency are ignored on purpose. Remove this entry as part of that port.
+      - dependency-name: "mcp"
+        update-types: ["version-update:semver-major"]
 
   # The attestation blueprint's Rust dependencies. It is a reference implementation that has not
   # been deployed, but it is compile-checked in CI and is the thing an auditor reads.
