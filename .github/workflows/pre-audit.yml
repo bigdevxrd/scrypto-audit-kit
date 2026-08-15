@@ -70,9 +70,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Add wasm target
-        run: rustup target add wasm32-unknown-unknown
-
       - name: Install the audit backend
         # audit.sh defaults to the claude-api backend, which imports `anthropic`
         # (bin/llm_audit.py). Its pre-flight only checks that python3 exists, so a missing

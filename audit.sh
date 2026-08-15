@@ -335,14 +335,12 @@ backend_claude_api() {
   local model="$1" out_file="$2" err_file="$3"
   local api_model="$model"
   [[ "$model" == "claude" ]] && api_model="claude-sonnet-4-6"
-  local read_args=() f
-  for f in "${READ_FILES[@]}"; do read_args+=("--read" "$f"); done
   python3 "$KIT_DIR/bin/llm_audit.py" \
     --model "$api_model" \
     --prompt "$KIT_DIR/prompts/audit.md" \
     --nonce "$NONCE" \
     --pkg-root "$TARGET" \
-    "${read_args[@]}" \
+    "${READ_ARGS[@]}" \
     "${TARGET_FILES[@]}" \
     > "$out_file" 2> >(tee -a "$err_file" >&2)
   return $?

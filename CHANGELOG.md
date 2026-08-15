@@ -51,6 +51,36 @@ for CI callers.**
   provenance block. The file is now trusted only beside an `audit.sh` (a real clone or editable
   install); otherwise the installed metadata is authoritative.
 
+- **`pip install "scrypto-audit-kit[mcp]"` was broken** ([pyproject.toml](pyproject.toml)) —
+  **high**, and live in the published v0.7.0. The extra pinned `mcp[cli]>=1.0` with no upper
+  bound, so pip now resolves **mcp 2.0.0**, which removed `mcp.server.fastmcp` — the module
+  [bin/mcp_server.py](bin/mcp_server.py) imports. `sak-mcp` then exits with *"needs the MCP SDK:
+  `pip install mcp[cli]`"*, which is exactly what the user had just run. Bounded to `<2`; lifting
+  it requires porting the server to the 2.x entry point first.
+
+### Removed
+
+Each of these was verified dead by re-deriving every reference across the tree and re-running the
+suite, the analyzer, and a full `audit.sh --static-only` against the removal — analyzer output and
+report are byte-identical, 211 tests green.
+
+- **The `Add wasm target` step in the reusable CI workflow.** It installed a Rust target on every
+  consumer run for a job that never compiles — `--compile-check` is opt-in and this workflow never
+  passes it. It was also the job's only dependency on `rustup` existing on the runner image, so it
+  was a latent failure liability for zero benefit.
+- **Three unused `ctx` keys in the analyzer** (`rel_path`, `raw`, `raw_lines`,
+  [bin/static_analysis.py](bin/static_analysis.py)). No rule reads them; `rel_path` reaches
+  findings by a separate route.
+- **A duplicated `--read` argument rebuild** in `audit.sh`'s `claude-api` backend — `READ_ARGS` is
+  already built before dispatch and `READ_FILES` is never mutated in between. Verified by capturing
+  the real argv on both sides: identical.
+- **`weak-model` from [.aider.conf.yml](.aider.conf.yml)** — both configured models resolve their
+  weak model to themselves, so the line never changed behaviour.
+
+Deliberately **not** removed, having checked: `llm_audit.assemble_report()` (not dead —
+not-yet-wired, and specified/tested/tracked), and the MCP `no_compile_check` parameter (inert, but
+a published tool contract; its docstrings now say so).
+
 ### Changed
 
 - **The sdist can build and test itself** (new [MANIFEST.in](MANIFEST.in)) — **high**. setuptools'

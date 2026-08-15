@@ -60,4 +60,11 @@ Found something interesting? Open a trial-report issue (see `.github/ISSUE_TEMPL
 
 ## Sample reports
 
-When the project has a few trial runs landed, sample reports will live alongside this README so new users can see what to expect. Until then, run one against [Ignition](https://github.com/radixdlt/Ignition) and you'll have your own sample in 60 seconds.
+A committed sample lives next to this README: [`vulnerable-vault.pre-audit.md`](vulnerable-vault.pre-audit.md)
+and its machine-readable [`vulnerable-vault.pre-audit.json`](vulnerable-vault.pre-audit.json) — a
+full run against the bundled [vulnerable-vault](vulnerable-vault) fixture.
+
+Read it as a *format* sample, not a difficulty sample: the fixture's bugs are planted, so the run
+finds them cleanly. Trial runs against real third-party blueprints — where the interesting question
+is what the kit **misses** — are still wanted, and are tracked on the [roadmap](../ROADMAP.md).
+Point it at [Ignition](https://github.com/radixdlt/Ignition) and you'll have your own in 60 seconds.

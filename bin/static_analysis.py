@@ -511,9 +511,6 @@ def analyze_text(rel_path, src):
     stripped = strip_comments_and_strings(src)
     code_with_strings = strip_comments_and_strings(src, keep_strings=True)
     ctx = {
-        "rel_path": rel_path,
-        "raw": src,
-        "raw_lines": src.splitlines(),
         "stripped": stripped,
         "stripped_lines": stripped.splitlines(),
         "comments_lines": strip_comments_and_strings(src, keep_comments=True).splitlines(),

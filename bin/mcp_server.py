@@ -87,7 +87,9 @@ def audit_package(package_path: str, model: str = "claude", no_compile_check: bo
     Args:
         package_path: Path to the package (a dir with Cargo.toml + src/lib.rs).
         model: Analysis model — "claude" (default), "deepseek", or "both".
-        no_compile_check: Skip the cargo wasm pre-flight (use if the toolchain isn't set up).
+        no_compile_check: Accepted for back-compat and ignored — the compile pre-flight is
+            opt-in and audit.sh never enables it from here. Kept because it is a published
+            tool-contract field (schema/mcp-tools.schema.json).
 
     Returns:
         The report.json contents (summary, findings, checklist_coverage, ...) with an added
@@ -125,7 +127,7 @@ def reaudit_diff(package_path: str, baseline_report_path: str, model: str = "cla
         package_path: The package to re-audit (after applying fixes).
         baseline_report_path: An earlier report.json to compare against.
         model: Analysis model — "claude" (default), "deepseek", or "both".
-        no_compile_check: Skip the cargo wasm pre-flight.
+        no_compile_check: Accepted for back-compat and ignored (see audit_package).
 
     Returns:
         {fixed, still_open, new} findings (matched by class+title) + summary counts + report_path.
