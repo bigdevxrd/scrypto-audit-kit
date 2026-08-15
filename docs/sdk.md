@@ -13,8 +13,8 @@ pip install "scrypto-audit-kit[schema]"  # + jsonschema validation
 pip install "scrypto-audit-kit[llm]"     # + the default claude-api audit backend (anthropic)
 ```
 
-The core needs **Python 3.8+**. The `[mcp]` extra needs **3.10+** — that is the MCP SDK's own
-floor, not ours; on 3.8/3.9 the extra installs nothing rather than failing, so the core still
+The core needs **Python 3.9+**. The `[mcp]` extra needs **3.10+** — that is the MCP SDK's own
+floor, not ours; on 3.9 the extra installs nothing rather than failing, so the core still
 works and only the MCP server is unavailable.
 
 ```python

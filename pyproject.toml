@@ -24,7 +24,12 @@ name = "scrypto-audit-kit"
 dynamic = ["version"]
 description = "Pre-audit toolkit for Scrypto blueprints on Radix: deterministic static analysis, an LLM checklist pass, machine-readable reports, an MCP server, and on-chain attestation."
 readme = "README.md"
-requires-python = ">=3.8"
+# 3.9, not 3.8. setuptools 75.3.4 is the last release supporting 3.8, and PEP 639 license
+# metadata needs >=77 — the two cannot coexist, so the sdist simply could not build on 3.8.
+# Python 3.8 has been end-of-life since 2024-10, and a floor the project cannot build on is a
+# claim, not a support commitment. (CI now tests this floor, which is how the conflict surfaced
+# the moment the matrix landed rather than after a downstream packager hit it.)
+requires-python = ">=3.9"
 # PEP 639 SPDX form. The old `license = { text = ... }` table is deprecated with a hard removal
 # date (setuptools 2027-02-18) and the build backend is unpinned above `>=64`, so leaving it
 # meant the build breaks on a day nobody chose. The paired `License ::` classifier is removed
@@ -40,7 +45,6 @@ classifiers = [
   # Per-version classifiers so PyPI's sidebar shows the real support surface rather than a bare
   # "Python :: 3". These must track `requires-python`.
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -53,11 +57,11 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# Every published `mcp` release requires python >= 3.10, but this project's floor is 3.8 and the
-# wheel is py3-none-any, so pip serves it to 3.8/3.9 users and then dies with an unresolvable
+# Every published `mcp` release requires python >= 3.10, but this project's floor is 3.9 and the
+# wheel is py3-none-any, so pip serves it to 3.9 users and then dies with an unresolvable
 # "No matching distribution found for mcp[cli]". The marker makes the extra resolve to nothing
 # there instead of erroring: the core still installs, the MCP server is simply absent — which is
-# the truth on those versions. Same for `dev`, or a contributor on the declared floor cannot
+# the truth on that version. Same for `dev`, or a contributor on the declared floor cannot
 # install the extras the test suite documents.
 #
 # The <2 bound is load-bearing, not caution: mcp 2.0.0 removed `mcp.server.fastmcp`, which is

@@ -44,12 +44,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Test the DECLARED floor, not just the newest. Testing only 3.12 is how two 3.8-specific
-        # breakages shipped: the [mcp]/[dev] extras were uninstallable there (every mcp release
-        # needs 3.10+), and nothing exercised the floor `requires-python` advertises.
+        # Test the DECLARED floor, not just the newest. Testing only 3.12 is how the
+        # uninstallable [mcp]/[dev] extras shipped — and adding this matrix immediately caught
+        # that a setuptools>=77 build requirement (PEP 639) cannot coexist with a 3.8 floor.
         include:
-          - python-version: '3.8'
-            # 3.8 is EOL and absent from the 24.04 runner image; 22.04 still provides it.
+          - python-version: '3.9'
+            # Not in the 24.04 runner image; 22.04 still provides it.
             runs-on: ubuntu-22.04
           - python-version: '3.12'
             runs-on: ubuntu-latest
@@ -59,7 +59,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install with dev extras (jsonschema + mcp enable contract validation + the MCP tests)
-        # On 3.8/3.9 the mcp marker resolves the extra to nothing — that is the point of this
+        # On 3.9 the mcp marker resolves the extra to nothing — that is the point of this
         # matrix entry: the install must SUCCEED there, with the MCP tests skipping cleanly.
         run: pip install ".[dev]"
       - name: Run unit tests

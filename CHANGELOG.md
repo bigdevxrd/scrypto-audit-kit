@@ -131,8 +131,15 @@ the same category of error as the attestation level it fixes.
 ### Packaging
 
 - **CI tests the Python floor it advertises** ([.github/workflows/lint.yml](.github/workflows/lint.yml)).
-  The suite ran on 3.12 only, which is precisely how two 3.8-specific breakages shipped. Now a
-  matrix of 3.8 (on `ubuntu-22.04`, since 3.8 is EOL and absent from the 24.04 image) and 3.12.
+  The suite ran on 3.12 only, which is precisely how the uninstallable `[mcp]`/`[dev]` extras
+  shipped. Now a matrix of the floor (on `ubuntu-22.04`) and 3.12 — and it earned its keep on the
+  first run, catching the item below.
+- **`requires-python` is now `>=3.9`, was `>=3.8`** — a narrowing, and the honest resolution of a
+  conflict the new matrix surfaced immediately. setuptools 75.3.4 is the last release supporting
+  3.8, and PEP 639 license metadata needs `>=77`; the two cannot coexist, so the sdist could not
+  build on the floor the project advertised. 3.8 has been end-of-life since 2024-10, and a floor
+  the project cannot build on is a claim rather than a support commitment. Wheel installs were
+  unaffected either way (`py3-none-any`); source builds and contributors were not.
 - **PEP 639 license metadata.** The `license = { text = ... }` table is deprecated with a hard
   removal date of 2027-02-18 against a build backend floored at `>=64` — i.e. the build was going
   to break on a day nobody chose. Now `license = "Apache-2.0"` + `license-files`, backend floor
