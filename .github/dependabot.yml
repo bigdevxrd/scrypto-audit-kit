@@ -1,0 +1,39 @@
+# Dependabot keeps the SHA-pinned actions moving.
+#
+# SHA-pinning without automated updates is how a project ends up frozen on an action release with
+# a known advisory — the pin that was a security control becomes the thing keeping the bug. These
+# two halves only work together, which is why they landed in the same change.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(actions)"
+    groups:
+      # One PR for the routine bumps; anything that needs thought still arrives alone.
+      actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # The deterministic core has zero required dependencies by design — this watches the optional
+  # extras (anthropic, mcp, jsonschema), which is where an advisory would actually land.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+
+  # The attestation blueprint's Rust dependencies. It is a reference implementation that has not
+  # been deployed, but it is compile-checked in CI and is the thing an auditor reads.
+  - package-ecosystem: cargo
+    directory: /attestation
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(attestation)"

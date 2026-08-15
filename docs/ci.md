@@ -6,10 +6,9 @@ version-controlled run on an independent runner rather than a one-off on someone
 
 Note what a green badge does and does not establish: it shows a run happened and passed your
 threshold. **L2 proper requires the run's provenance to be signed** by the build platform, so a
-reader can verify it was not produced by the claimant. Until the kit emits an OIDC-signed
-statement (tracked on the [roadmap](../ROADMAP.md)), treat CI runs as L1 with a strong audit
-trail, and see [attestation-levels.md](attestation-levels.md) for what each rung actually
-requires.
+reader can verify it was not produced by the claimant. Set `sign-provenance: true` to get that —
+see [Earning L2](#4-earning-l2--signed-provenance) below. Without it, a CI run is L1 with a strong
+audit trail; [attestation-levels.md](attestation-levels.md) has the full rule.
 
 ## 1. Add the workflow
 
@@ -19,11 +18,11 @@ Copy [`examples/ci/pre-audit.yml`](../examples/ci/pre-audit.yml) into your repo 
 ```yaml
 jobs:
   scrypto-pre-audit:
-    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.7.1
+    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.8.0
     with:
       package: packages/my-blueprint
       fail-on: high
-      kit-ref: v0.7.1
+      kit-ref: v0.8.0
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
@@ -33,7 +32,7 @@ selects the audit code the workflow checks out, and `kit-ref` defaults to `main`
 leave it off. `@main` runs whatever is on the kit's HEAD at that moment, in your CI, with
 your `ANTHROPIC_API_KEY` in reach.
 
-**Use v0.7.1 or later — this is a floor, not just "the newest tag".** Every earlier tag lets code
+**Use v0.8.0 or later — this is a floor, not just "the newest tag".** Every earlier tag lets code
 from the package you are auditing run inside your CI job:
 
 - **`v0.7.0` and earlier** run the backend-install probe (`python3 -c 'import anthropic'`) with
@@ -47,7 +46,7 @@ from the package you are auditing run inside your CI job:
   to the `claude-api` backend while installing only aider, so its default run dies mid-audit on a
   missing `anthropic`. (`v0.5.0` predates that backend — only the injection affects it.)
 
-If `v0.7.1` is not tagged yet, pin a commit SHA from the kit's `main` instead of dropping back to
+If `v0.8.0` is not tagged yet, pin a commit SHA from the kit's `main` instead of dropping back to
 an older tag — a SHA is just as reproducible and does not carry the vulnerable workflow.
 
 ## 2. Add the secret
@@ -67,11 +66,45 @@ On every PR (and on demand via *Run workflow*) it:
 2. uploads both as a build artifact (`pre-audit-report`);
 3. **fails the check** if any finding is at or above `fail-on` (default `high`).
 
-Pin `kit-ref:` to a released tag (e.g. `v0.7.1`) so the *method* is fixed over time: the
+Pin `kit-ref:` to a released tag (e.g. `v0.8.0`) so the *method* is fixed over time: the
 static-tier findings then reproduce exactly, while the LLM-tier findings are advisory and
 vary run-to-run, so don't expect a byte-identical report.
 
-## 4. The badge
+## 4. Earning L2 — signed provenance
+
+Everything above proves a report exists. It does not prove *who produced it* — and that is the
+whole content of rung L2. Opt in:
+
+```yaml
+jobs:
+  scrypto-pre-audit:
+    permissions:
+      contents: read
+      id-token: write        # OIDC — lets GitHub sign as your repo
+      attestations: write    # stores the attestation against your repo
+    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.8.0
+    with:
+      package: packages/my-blueprint
+      sign-provenance: true
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+Both permissions are required on **your** job. A reusable workflow can only narrow the caller's
+token, never widen it, so the kit cannot grant these for you — without them the signing step
+fails while the audit itself still runs.
+
+Anyone can then verify the report came from your workflow, on your commit, rather than from
+someone's laptop:
+
+```bash
+gh attestation verify report.json --repo OWNER/REPO
+```
+
+Signing runs only when the gate passed — a signed statement for a report that failed its own
+threshold would attest to a run you already rejected.
+
+## 5. The badge
 
 Once the workflow has run at least once, add its status badge to your README
 (replace `OWNER/REPO`):

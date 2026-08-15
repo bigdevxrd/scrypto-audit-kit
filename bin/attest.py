@@ -64,7 +64,7 @@ def _derive_mode(report):
     so an absent, unknown, or user-supplied model string asserted that the LLM checklist pass had
     run when it had not, and `--no-static` (no deterministic tier at all) still derived "hybrid".
 
-    A report with no `tiers` at all predates 0.7.1. It derives `static`: the lowest claim, never
+    A report with no `tiers` at all predates 0.8.0. It derives `static`: the lowest claim, never
     an assumption that the LLM pass ran.
     """
     tiers = report.get("kit", {}).get("tiers")

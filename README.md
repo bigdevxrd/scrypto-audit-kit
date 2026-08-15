@@ -1,26 +1,26 @@
 # scrypto-audit-kit
 
 [![lint](https://github.com/bigdevxrd/scrypto-audit-kit/actions/workflows/lint.yml/badge.svg)](https://github.com/bigdevxrd/scrypto-audit-kit/actions/workflows/lint.yml)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/LICENSE)
 [![Scrypto · Radix](https://img.shields.io/badge/Scrypto-Radix-052CC0)](https://docs.radixdlt.com/docs/scrypto-1)
 [![status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#limitations--read-this-before-relying-on-the-output)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/CONTRIBUTING.md)
 
 Pre-audit harness for [Scrypto](https://docs.radixdlt.com/docs/scrypto-1) blueprints on the Radix network. Runs a **hybrid analysis** — deterministic static rules plus an LLM pass over a curated checklist + reference patterns — and produces a findings report (markdown + JSON) you can hand to a human auditor (or use to fix issues yourself). The static pass alone is free and needs no API key.
 
 This is a **pre-audit** tool, not an audit. It catches the kinds of issues a careful reviewer would catch on a first read so that paid auditors can spend their time on the harder, second-read findings. **It does not replace a human audit before mainnet deployment.**
 
-> **Where this fits** — the kit is the entry rung of a *trust ladder* that climbs from `cargo check` up to a full human audit (Hacken, Certik, …). The bigger plan — agentic audit→fix→verify loops, reproducible attested runs, and on-chain attestation — lives in **[VISION.md](VISION.md)**.
+> **Where this fits** — the kit is the entry rung of a *trust ladder* that climbs from `cargo check` up to a full human audit (Hacken, Certik, …). The bigger plan — agentic audit→fix→verify loops, reproducible attested runs, and on-chain attestation — lives in **[VISION.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/VISION.md)**.
 
 ## What it does
 
 For each scrypto package you point it at, the kit:
 
 1. Runs a **deterministic static pass** (free, no API) — a curated set of high-precision Scrypto rules (unbounded drains, no-owner globalize, self-rotating roles, floats, hardcoded addresses, …).
-2. Sends the package's source (Cargo.toml + everything under `src/` and `tests/`) to an LLM through an **interchangeable backend** — the Anthropic API directly by default, or aider, or your own agent ([docs/backends.md](docs/backends.md)).
+2. Sends the package's source (Cargo.toml + everything under `src/` and `tests/`) to an LLM through an **interchangeable backend** — the Anthropic API directly by default, or aider, or your own agent ([docs/backends.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/backends.md)).
 3. Loads a vulnerability **checklist** (11 classes — auth, reentrancy, decimal, resource handling, time, state machine, external calls, upgrade, oracle, slippage, allowances) and a catalogue of **reference patterns** (Ignition, CaviarNine HyperStake, subintents, a strategy-vault threat model, general scrypto knowledge) as read-only context.
 4. Asks Claude Sonnet 4.6 (the default model) to produce a structured findings report — summary, findings (Critical → Info), checklist coverage walk, pattern conformance check, test-coverage gaps, open questions for the human auditor.
-5. Merges both passes and writes a markdown report to `audit-reports/<repo>-<package>-<date>.md` **and** a machine-readable `report.json` ([schema](schema/audit-report.schema.json)) that agents and the CI gate consume.
+5. Merges both passes and writes a markdown report to `audit-reports/<repo>-<package>-<date>.md` **and** a machine-readable `report.json` ([schema](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/schema/audit-report.schema.json)) that agents and the CI gate consume.
 
 The kit is **read-only by design**. It produces reports; it does not edit your blueprint. Edits to audit-grade code must go through a separate, human-supervised session.
 
@@ -34,14 +34,14 @@ git clone https://github.com/bigdevxrd/scrypto-audit-kit
 
 The pip package gives you the free static analysis, test-scaffold generation, the attestation
 bridge, and the MCP server — importable and as `sak-*` commands. The full `./audit.sh` (the LLM
-checklist pass) lives in the clone. **[docs/quickstart.md](docs/quickstart.md)** walks all three
+checklist pass) lives in the clone. **[docs/quickstart.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/quickstart.md)** walks all three
 tiers end to end.
 
 ### Requirements (for the full `./audit.sh` audit)
 
 - **The default `claude-api` backend**: `python3`, the `anthropic` package (`pip install ".[llm]"`), and an Anthropic API key (defaults to Claude Sonnet 4.6 — get one at <https://console.anthropic.com>).
 - bash, awk, find (standard on macOS / Linux).
-- Other backends have their own needs — `--backend aider` wants [aider](https://aider.chat) (`pip install aider-chat` ≥ 0.86); `--backend cmd` runs your own command. See [docs/backends.md](docs/backends.md).
+- Other backends have their own needs — `--backend aider` wants [aider](https://aider.chat) (`pip install aider-chat` ≥ 0.86); `--backend cmd` runs your own command. See [docs/backends.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/backends.md).
 - For `--static-only` you need none of the above — not even `python3` for the markdown report (`python3` is only needed for the machine-readable `report.json`).
 
 The key can be provided in any of three ways:
@@ -108,7 +108,7 @@ The report lands in `audit-reports/<repo>-<package>-<YYYY-MM-DD>.md`. Reports ar
 ### Choosing a backend and model
 
 The LLM pass runs through an interchangeable **backend** (full guide:
-[docs/backends.md](docs/backends.md)). The default is `claude-api` — the Anthropic API
+[docs/backends.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/backends.md)). The default is `claude-api` — the Anthropic API
 directly, no aider — on Claude Sonnet 4.6:
 
 ```bash
@@ -131,7 +131,7 @@ A static pass runs on every audit, and you can run it *alone* with **no API key,
 ./audit.sh --static-only <path>     # free, instant, deterministic
 ```
 
-It applies a curated set of high-precision Scrypto rules — comment/string-aware, so code rules don't match inside comments or string literals — and writes the same `report.json`. Suppress a finding with a `// sak:allow <rule-id>` comment; add `--no-static` to a full run to skip the pass. See [docs/static-analysis.md](docs/static-analysis.md) for the rule list and how to add one.
+It applies a curated set of high-precision Scrypto rules — comment/string-aware, so code rules don't match inside comments or string literals — and writes the same `report.json`. Suppress a finding with a `// sak:allow <rule-id>` comment; add `--no-static` to a full run to skip the pass. See [docs/static-analysis.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/static-analysis.md) for the rule list and how to add one.
 
 ### Try it on the bundled example
 
@@ -141,20 +141,20 @@ The repo ships a deliberately-vulnerable blueprint so you can see real output wi
 ./audit.sh --static-only examples/vulnerable-vault   # free; drop --static-only for the full hybrid run
 ```
 
-The expected result is committed beside it — [`examples/vulnerable-vault.pre-audit.md`](examples/vulnerable-vault.pre-audit.md) (human) and [`.json`](examples/vulnerable-vault.pre-audit.json) (machine-readable). Every `file:line` in it is exact, because the bugs are planted.
+The expected result is committed beside it — [`examples/vulnerable-vault.pre-audit.md`](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/examples/vulnerable-vault.pre-audit.md) (human) and [`.json`](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/examples/vulnerable-vault.pre-audit.json) (machine-readable). Every `file:line` in it is exact, because the bugs are planted.
 
 ### Machine-readable output
 
-Alongside the markdown, the kit writes `report.json` conforming to [`schema/audit-report.schema.json`](schema/audit-report.schema.json) — stable ids (`F-###` from the LLM, `S-###` from the static pass, each tagged with its `source`), severities, full checklist coverage, and a provenance block (kit version, model, checklist version, and a sha256 of the analyzed source). This is what agents, the CI gate, and (later) on-chain attestation consume; the markdown is a render of it.
+Alongside the markdown, the kit writes `report.json` conforming to [`schema/audit-report.schema.json`](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/schema/audit-report.schema.json) — stable ids (`F-###` from the LLM, `S-###` from the static pass, each tagged with its `source`), severities, full checklist coverage, and a provenance block (kit version, model, checklist version, and a sha256 of the analyzed source). This is what agents, the CI gate, and (later) on-chain attestation consume; the markdown is a render of it.
 
 ### Continuous integration & a badge
 
-Run the pre-audit on every PR and show a status badge — full setup in [docs/ci.md](docs/ci.md). In short, call the reusable workflow:
+Run the pre-audit on every PR and show a status badge — full setup in [docs/ci.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/ci.md). In short, call the reusable workflow:
 
 ```yaml
 jobs:
   scrypto-pre-audit:
-    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.7.1
+    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.8.0
     with:
       package: packages/my-blueprint
       fail-on: high
@@ -165,7 +165,7 @@ jobs:
 
 It audits, uploads the report, and fails on High/Critical findings — an honest "pre-audit passing" signal, not a safety guarantee. It does **not** compile your package: the `cargo` pre-flight is opt-in (`--compile-check`) and this workflow never passes it.
 
-Pin **v0.7.0 or later** — that is the release carrying the workflow fix. The `v0.5.0` and `v0.6.0` tags interpolate caller inputs into `run:` scripts inside the job that holds your `ANTHROPIC_API_KEY`; [docs/ci.md](docs/ci.md) has the detail and the SHA-pinning fallback if v0.7.0 is not tagged yet.
+Pin **v0.7.0 or later** — that is the release carrying the workflow fix. The `v0.5.0` and `v0.6.0` tags interpolate caller inputs into `run:` scripts inside the job that holds your `ANTHROPIC_API_KEY`; [docs/ci.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/ci.md) has the detail and the SHA-pinning fallback if v0.7.0 is not tagged yet.
 
 ### Use it from an agent (MCP + Claude Code)
 
@@ -176,7 +176,7 @@ pip install "mcp[cli]"
 claude mcp add --transport stdio scrypto-audit-kit -- python3 "$PWD/bin/mcp_server.py"
 ```
 
-Tools: `static_scan` (free), `audit_package`, `propose_tests`, `attestation_payload`, `get_findings`, `show_finding_source`, `reaudit_diff`, `gate`, `get_checklist`. There's also a Claude Code skill (`/scrypto-pre-audit`) and an [AGENTS.md](AGENTS.md) playbook for any agent. Full setup — including the audit→fix→verify loop — in [docs/agents.md](docs/agents.md); the nine tools and their formal contracts are in [docs/mcp-tools.md](docs/mcp-tools.md).
+Tools: `static_scan` (free), `audit_package`, `propose_tests`, `attestation_payload`, `get_findings`, `show_finding_source`, `reaudit_diff`, `gate`, `get_checklist`. There's also a Claude Code skill (`/scrypto-pre-audit`) and an [AGENTS.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/AGENTS.md) playbook for any agent. Full setup — including the audit→fix→verify loop — in [docs/agents.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/agents.md); the nine tools and their formal contracts are in [docs/mcp-tools.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/mcp-tools.md).
 
 ### Build on it — the Python SDK
 
@@ -190,13 +190,13 @@ verdict  = sak_lib.gate_verdict(sak_lib.build_report(findings), "high")
 ```
 
 The full API, the nine tools in-process, and the `sak-*` console scripts are in
-[docs/sdk.md](docs/sdk.md). Three runnable example agents — a free-tier CI gate, the
-audit→fix→verify loop, and an MCP client — are in [examples/agents/](examples/agents/).
+[docs/sdk.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/sdk.md). Three runnable example agents — a free-tier CI gate, the
+audit→fix→verify loop, and an MCP client — are in [examples/agents/](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/examples/agents/).
 
 ### Generate tests, attest on-chain
 
 - **Property tests.** `propose_tests` (or `python3 bin/gen_tests.py <pkg>`) emits compilable `#[ignore]`d `scrypto-test` scaffolds for the coverage gaps — auth negative-paths, happy paths, a value invariant — so closing them is fill-in-the-blank.
-- **On-chain attestation (L3).** `attestation_payload` (or `python3 bin/attest.py <report.json>`) turns a report into a Radix transaction manifest that records an attestation on-ledger via the [attestation/](attestation/) registry blueprint — bound to your exact source hash (the deterministic anchor). A coverage record, not a safety guarantee, and for the LLM tier not byte-reproducible (see [attestation/README.md](attestation/README.md)).
+- **On-chain attestation (L3).** `attestation_payload` (or `python3 bin/attest.py <report.json>`) turns a report into a Radix transaction manifest that records an attestation on-ledger via the [attestation/](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/attestation/) registry blueprint — bound to your exact source hash (the deterministic anchor). A coverage record, not a safety guarantee, and for the LLM tier not byte-reproducible (see [attestation/README.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/attestation/README.md)).
 
 ## What's in the kit
 
@@ -229,17 +229,17 @@ scrypto-audit-kit/
 
 ## Documentation
 
-Everything is in **[docs/](docs/README.md)**; the short list:
+Everything is in **[docs/](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/README.md)**; the short list:
 
-- [quickstart.md](docs/quickstart.md) — install + run, all three tiers
-- [backends.md](docs/backends.md) — the pluggable LLM backends (claude-api · aider · your own)
-- [static-analysis.md](docs/static-analysis.md) — the deterministic rules (and adding one)
-- [agents.md](docs/agents.md) · [mcp-tools.md](docs/mcp-tools.md) — drive it from an agent / over MCP
-- [sdk.md](docs/sdk.md) — the Python API + console scripts
-- [ci.md](docs/ci.md) — CI gate + badge
-- [architecture.md](docs/architecture.md) — how the pieces fit together
-- [SECURITY.md](SECURITY.md) — reporting a vulnerability *in the kit* (not a finding it reported)
-- [VISION.md](VISION.md) · [ROADMAP.md](ROADMAP.md) · [CHANGELOG.md](CHANGELOG.md) — strategy, status, history
+- [quickstart.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/quickstart.md) — install + run, all three tiers
+- [backends.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/backends.md) — the pluggable LLM backends (claude-api · aider · your own)
+- [static-analysis.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/static-analysis.md) — the deterministic rules (and adding one)
+- [agents.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/agents.md) · [mcp-tools.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/mcp-tools.md) — drive it from an agent / over MCP
+- [sdk.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/sdk.md) — the Python API + console scripts
+- [ci.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/ci.md) — CI gate + badge
+- [architecture.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/architecture.md) — how the pieces fit together
+- [SECURITY.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/SECURITY.md) — reporting a vulnerability *in the kit* (not a finding it reported)
+- [VISION.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/VISION.md) · [ROADMAP.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/ROADMAP.md) · [CHANGELOG.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/CHANGELOG.md) — strategy, status, history
 
 ## Limitations — read this before relying on the output
 
@@ -271,11 +271,11 @@ This kit is community-maintained and gets stronger with more eyes on it. The mos
 - **Trial reports.** Run the kit against a public blueprint and share what it found (or missed). Negative results are valuable.
 - **Harness fixes.** False-positive patterns, brittle parsing, missing edge cases in `audit.sh`.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
+See [CONTRIBUTING.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/CONTRIBUTING.md) for the workflow.
 
 ## License
 
-[Apache 2.0](LICENSE) — the same license most of the upstream Radix ecosystem uses. Forks, derivatives, and commercial use all welcome; attribution preserved per the license.
+[Apache 2.0](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/LICENSE) — the same license most of the upstream Radix ecosystem uses. Forks, derivatives, and commercial use all welcome; attribution preserved per the license.
 
 ## Related
 

@@ -35,7 +35,7 @@ Every field is a fact a relying party can check or a value the producer is merel
 | `attested_at_epoch` | **Yes** — the ledger sets it |
 | `issuer_verified` | **Yes** — only the registry's `issuer` role can set it |
 
-Notably **absent**: any `level` field. It was removed in v0.7.1. Recording one would be
+Notably **absent**: any `level` field. It was removed in v0.8.0. Recording one would be
 self-referential — L3 *is* the existence of the record, so it cannot also be an input to it — and
 it is the single field an attacker would forge, on a record the blueprint cannot validate.
 
@@ -83,7 +83,7 @@ Two different failures, two different answers:
   `lock_fee` — so emitting one converts a clear local error into a wasted transaction, or into a
   log line stating a mode before the failure. The artifact is permanent and unburnable.
 - **Ambiguous depth → claim the lowest.** `mode` is derived from `kit.tiers`, and every tier must
-  be positively present to be claimed. A report with no `tiers` (anything before v0.7.1) derives
+  be positively present to be claimed. A report with no `tiers` (anything before v0.8.0) derives
   `static`, never `hybrid`.
 
 Both follow the kit's existing idiom: `sak-gate` fails closed on a missing reports dir, an

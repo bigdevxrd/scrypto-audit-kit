@@ -13,8 +13,8 @@ pip install "scrypto-audit-kit[schema]"  # + jsonschema validation
 pip install "scrypto-audit-kit[llm]"     # + the default claude-api audit backend (anthropic)
 ```
 
-The core needs **Python 3.8+**. The `[mcp]` extra needs **3.10+** — that is the MCP SDK's own
-floor, not ours; on 3.8/3.9 the extra installs nothing rather than failing, so the core still
+The core needs **Python 3.9+**. The `[mcp]` extra needs **3.10+** — that is the MCP SDK's own
+floor, not ours; on 3.9 the extra installs nothing rather than failing, so the core still
 works and only the MCP server is unavailable.
 
 ```python
@@ -26,7 +26,7 @@ from scrypto_audit_kit import static_analysis, sak_lib, attest, gen_tests
 Importing the package is **side-effect free** — it does not touch `sys.path`, so it cannot shadow
 a module of your own. (Up to and including v0.7.0 it did: a module in your application named
 `attest`, `sak_lib`, `static_analysis`, `gen_tests`, `llm_audit`, `mcp_server` or `ci_gate` was
-silently redirected to the kit's for the rest of the process. Fixed in v0.7.1 —
+silently redirected to the kit's for the rest of the process. Fixed in v0.8.0 —
 [#5](https://github.com/bigdevxrd/scrypto-audit-kit/issues/5).)
 
 (Running from a clone without installing? Every [example agent](../examples/agents/) falls back

@@ -57,3 +57,19 @@ sak-static --help
 
 The git tag and the CI-green commit are the source of truth; the `report.json` provenance block
 records whichever kit version produced a given report.
+
+### Verifying the artifacts are ours (PEP 740)
+
+Trusted Publishing signs every upload with GitHub's OIDC identity, so a consumer can confirm a
+release was built by this repo's `release.yml` and not uploaded by someone holding a stolen
+token. This has been true since v0.5.0 and was simply never documented — an unverifiable
+signature helps nobody.
+
+```bash
+pip download --no-deps scrypto-audit-kit==<version>
+gh attestation verify scrypto_audit_kit-<version>-py3-none-any.whl --repo bigdevxrd/scrypto-audit-kit
+```
+
+PyPI also shows the attestation on each file's page under **Provenance**. For a security tool
+this is the point: "pin by tag" and "install from PyPI" are only supply-chain advice if the
+artifact's origin can actually be checked.
