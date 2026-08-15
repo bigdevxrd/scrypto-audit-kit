@@ -15,8 +15,13 @@ docs/sdk.md for what runs where.
 Implementation note: the modules in this directory cross-import by bare name
 (`import sak_lib`) — the historical layout, which keeps a bare `git clone` runnable with
 no install. So that those bare imports resolve when the directory is imported as the
-`scrypto_audit_kit` package, we put the package directory on sys.path here. Converting the
-cross-imports to relative imports is tracked for a future release (see ROADMAP.md).
+`scrypto_audit_kit` package, we put the package directory on sys.path here.
+
+Caveat, because this is a real cost to consumers: the insert is at index 0, so importing
+this package also shadows any top-level module a consuming application owns under one of
+our names (`attest`, `sak_lib`, `static_analysis`, `gen_tests`, `llm_audit`, `mcp_server`,
+`ci_gate`) for the rest of the process. Converting the cross-imports to relative imports and
+dropping the insert is tracked in issue #5 and on the Phase 5 list in ROADMAP.md.
 """
 import os as _os
 import sys as _sys
