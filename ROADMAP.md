@@ -47,8 +47,8 @@ Anything unchecked is fair game — open an issue to claim it.
 - [x] Formal JSON-schema contracts for all 9 MCP tools ([schema/mcp-tools.schema.json](schema/mcp-tools.schema.json))
 - [x] Runnable example agents — CI gate, audit → fix → verify, MCP client ([examples/agents/](examples/agents/))
 - [x] Documentation suite — quickstart · SDK · MCP tools · architecture ([docs/](docs/README.md))
-- [ ] Convert the package's bare cross-imports (`import sak_lib`) to relative imports and drop the
-  `sys.path` insert in `bin/__init__.py` — it currently shadows a consumer's own top-level modules
+- [x] Guarded relative cross-imports, and no `sys.path` insert in `bin/__init__.py` — importing the
+  package is side-effect free and can no longer shadow a consumer's own top-level modules
   ([#5](https://github.com/bigdevxrd/scrypto-audit-kit/issues/5))
 
 ---

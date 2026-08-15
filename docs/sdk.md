@@ -23,6 +23,12 @@ print(sak.__version__)
 from scrypto_audit_kit import static_analysis, sak_lib, attest, gen_tests
 ```
 
+Importing the package is **side-effect free** — it does not touch `sys.path`, so it cannot shadow
+a module of your own. (Up to and including v0.7.0 it did: a module in your application named
+`attest`, `sak_lib`, `static_analysis`, `gen_tests`, `llm_audit`, `mcp_server` or `ci_gate` was
+silently redirected to the kit's for the rest of the process. Fixed in v0.7.1 —
+[#5](https://github.com/bigdevxrd/scrypto-audit-kit/issues/5).)
+
 (Running from a clone without installing? Every [example agent](../examples/agents/) falls back
 to `../../bin` automatically — the same import shim works in your own scripts.)
 

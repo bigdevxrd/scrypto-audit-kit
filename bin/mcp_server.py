@@ -18,10 +18,16 @@ import re
 import subprocess
 import sys
 
-import attest
-import gen_tests
-import sak_lib
-import static_analysis
+try:  # installed: real submodules of the scrypto_audit_kit package
+    from . import attest
+    from . import gen_tests
+    from . import sak_lib
+    from . import static_analysis
+except ImportError:  # bare clone / direct script run: bin/ is itself on sys.path
+    import attest
+    import gen_tests
+    import sak_lib
+    import static_analysis
 
 def _kit_home():
     """Locate the kit's repo resources (audit.sh, prompts/, schema/).

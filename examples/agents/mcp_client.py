@@ -66,8 +66,15 @@ async def run(pkg):
 
             # The gate wants a report.json on disk; write the scan out and gate it.
             report_path = os.path.join(KIT_ROOT, "audit-reports", "_mcp_client_demo.json")
-            sys.path.insert(0, os.path.join(KIT_ROOT, "bin"))
-            import sak_lib  # type: ignore
+            # Prefer the installed package, exactly as static_gate.py and audit_fix_verify.py
+            # do. The bare `sys.path.insert` this used to do unconditionally was the same
+            # process-global pollution issue #5 is about — and doing it in the kit's own
+            # example would have taught consumers the pattern we just removed.
+            try:
+                from scrypto_audit_kit import sak_lib
+            except ImportError:
+                sys.path.insert(0, os.path.join(KIT_ROOT, "bin"))
+                import sak_lib  # type: ignore
             with open(report_path, "w", encoding="utf-8") as fh:
                 json.dump(sak_lib.build_report(scan["findings"]), fh)
             try:

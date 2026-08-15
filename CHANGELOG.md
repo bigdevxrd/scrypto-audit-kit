@@ -32,6 +32,24 @@ for CI callers.**
   with no `.rs` files, with `--allow-empty` as the explicit opt-out — matching `sak-gate`, which
   has always failed closed on a missing reports dir. The two entry points in one wheel no longer
   ship opposite safety defaults.
+- **Importing the package no longer shadows the consumer's own modules**
+  ([`bin/__init__.py`](bin/__init__.py), [#5](https://github.com/bigdevxrd/scrypto-audit-kit/issues/5))
+  — **behaviour change, and the reason to upgrade if you build on the SDK.** `bin/__init__.py`
+  did `sys.path.insert(0, <package dir>)` so the modules' bare cross-imports (`import sak_lib`)
+  resolved when `bin/` was imported as `scrypto_audit_kit`. That insert was process-global and at
+  index 0: any application importing the kit had `attest`, `sak_lib`, `static_analysis`,
+  `gen_tests`, `llm_audit`, `mcp_server` and `ci_gate` silently redirected to ours for the rest of
+  its run — including modules sitting in its own working directory. The cross-imports are now
+  guarded (relative when we are a package, bare when a module runs directly as a script), so the
+  bare-clone and direct-script paths still work with no global mutation. `import scrypto_audit_kit`
+  is now side-effect free. The kit's own `examples/agents/mcp_client.py` did the same
+  unconditional insert and was fixed alongside, so the shipped examples no longer teach the
+  pattern.
+- **The kit version no longer trusts a `VERSION` file it does not own** ([`bin/__init__.py`](bin/__init__.py)).
+  Installed, the path it read resolves to `site-packages/VERSION` — anything dropping a file there
+  would be reported as the kit's version, and that string is stamped into every report's
+  provenance block. The file is now trusted only beside an `audit.sh` (a real clone or editable
+  install); otherwise the installed metadata is authoritative.
 
 ### Changed
 
@@ -42,7 +60,7 @@ for CI callers.**
   died immediately, and after that 27 tests failed on absent fixtures. Downstream packagers
   (conda-forge, Debian, Nix, corporate mirrors) build from the sdist by convention, and for a
   security tool it is also how someone verifies from source that the artifact matches the repo.
-  The sdist now runs its full 205-test suite green.
+  The sdist now runs its full 211-test suite green.
 - **The `[mcp]` and `[dev]` extras are installable on the Python version we claim to support**
   ([pyproject.toml](pyproject.toml)) — **high**. Every published `mcp` release requires 3.10+,
   but `requires-python` is `>=3.8` and the wheel is `py3-none-any`, so pip served it to 3.8/3.9
@@ -61,10 +79,13 @@ for CI callers.**
 ### Added
 
 - Regression tests for both security fixes ([tests/test_security.py](tests/test_security.py)) —
-  8 new cases, 205 total. They pin the analyzer's fail-closed behaviour, assert no `python3 -c`
-  runs without `-P` in any workflow, assert the untrusted checkout stays out of the workspace
-  root, and *demonstrate the attack itself* so a future "`-P` looks like cargo-culting" cleanup
-  fails loudly.
+  8 new cases. They pin the analyzer's fail-closed behaviour, assert no `python3 -c` runs without
+  `-P` in any workflow, assert the untrusted checkout stays out of the workspace root, and
+  *demonstrate the attack itself* so a future "`-P` looks like cargo-culting" cleanup fails loudly.
+- Import-hygiene regression tests ([tests/test_import_hygiene.py](tests/test_import_hygiene.py)) —
+  6 cases that synthesize a consuming application owning modules named like ours and assert, in a
+  subprocess, that importing the kit neither mutates `sys.path` nor shadows them, while the kit
+  still resolves its own. 4 of the 6 fail against v0.7.0. **211 tests total.**
 
 ## [0.7.0] — 2026-08-15 — CI hardening and rule precision
 
