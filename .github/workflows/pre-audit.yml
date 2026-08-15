@@ -169,6 +169,6 @@ jobs:
         # a signature attesting to a run the caller already rejected. Opt-out because it writes an
         # attestation against the CALLER's repo, and not every caller wants that.
         if: success() && inputs.sign-provenance
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: .scrypto-audit-kit/audit-reports/*.json
