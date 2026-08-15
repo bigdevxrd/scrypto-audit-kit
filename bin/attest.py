@@ -11,7 +11,10 @@ import hashlib
 import json
 import sys
 
-import sak_lib
+try:  # installed: real submodules of the scrypto_audit_kit package
+    from . import sak_lib
+except ImportError:  # bare clone / direct script run: bin/ is itself on sys.path
+    import sak_lib
 
 
 def _sha256_file(path):

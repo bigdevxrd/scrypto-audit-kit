@@ -21,7 +21,10 @@ import os
 import re
 import sys
 
-import static_analysis
+try:  # installed: real submodules of the scrypto_audit_kit package
+    from . import static_analysis
+except ImportError:  # bare clone / direct script run: bin/ is itself on sys.path
+    import static_analysis
 
 _GATING_RE = re.compile(r"(\w+)\s*=>\s*(PUBLIC|restrict_to:\s*\[\s*([\w, ]+?)\s*\])")
 _IMPL_RE = re.compile(r"\bimpl\s+(\w+)")

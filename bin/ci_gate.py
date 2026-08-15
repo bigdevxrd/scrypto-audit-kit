@@ -12,7 +12,10 @@ here, so existing invocations (the pre-audit CI workflow, tests) keep working.
 import argparse
 import sys
 
-import sak_lib
+try:  # installed: real submodules of the scrypto_audit_kit package
+    from . import sak_lib
+except ImportError:  # bare clone / direct script run: bin/ is itself on sys.path
+    import sak_lib
 
 
 def main():
