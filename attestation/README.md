@@ -15,8 +15,13 @@ byte-reproducible:
 What is actually verifiable depends on the tier:
 
 - **`source_hash`** (sha256 of the analysed source) is the stable anchor — anyone can recompute it from the code and confirm the attestation is *about* that exact source.
-- **L1-static** findings are **deterministic**: re-run `./audit.sh --static-only` on the same source and you get the same findings.
-- **L2-hybrid** adds a non-deterministic LLM pass, so `report.json` (and thus `report_hash`) will **not** be identical on re-run. For L2, `report_hash` is a tamper-evidence fingerprint of *one archived report*, not a value a third party can regenerate.
+- **`mode: static`** findings are **deterministic**: re-run the ruleset named by `static_ruleset_version` on the same source and you get the same findings.
+- **`mode: llm` / `mode: hybrid`** include a non-deterministic LLM pass, so `report.json` (and thus `report_hash`) will **not** be identical on re-run — `report_hash` is then a tamper-evidence fingerprint of *one archived report*, not a value a third party can regenerate.
+
+`mode` records **what ran**, not how much to trust it. The record carries no L-number: the
+L1/L2/L3 rung is computed by the reader from mode + who attested + `issuer_verified`, per
+[docs/attestation-levels.md](../docs/attestation-levels.md). Recording a level here would be
+circular — L3 *is* this record existing.
 
 So an attestation proves *which source was analysed and what one run reported* — it does **not**, by itself, prove the kit was run or that the counts are honest (see self-attestation below). The strongest signal is `issuer_verified`.
 
@@ -51,8 +56,9 @@ python3 bin/attest.py audit-reports/<repo>-<pkg>-<date>.json \
 ```
 
 It reads the `source_hash` from the report, hashes the report (and optionally the wasm),
-counts findings by severity, derives the level (`L1-static` or `L2-hybrid`), and renders the
-manifest. Submit `attest.rtm` with your wallet / the Radix CLI.
+counts findings by severity, records the mode that ran (`static` / `llm` / `hybrid`), and renders
+the manifest. It refuses a report with no `source_hash` anchor rather than emitting a payload the
+chain would reject after your fee is locked. Submit `attest.rtm` with your wallet / the Radix CLI.
 
 ## Building & deploying
 

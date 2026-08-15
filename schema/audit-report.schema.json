@@ -16,7 +16,14 @@
       "required": ["version", "model", "checklist_version", "generated_at"],
       "properties": {
         "version": { "type": "string", "description": "kit version, e.g. 0.1.0 or 0.1.0+g1a2b3c4" },
-        "model": { "type": "string", "description": "analysis model, e.g. anthropic/claude-sonnet-4-6" },
+        "model": { "type": "string", "description": "analysis model, e.g. anthropic/claude-sonnet-4-6. A DISPLAY label — never parse it to decide what ran; read `tiers` instead." },
+        "tiers": {
+          "type": "array",
+          "description": "Which analysis tiers actually ran, as a fact. The only field an attestation mode may be derived from. Optional, for reports produced before 0.7.1: consumers MUST treat its absence as 'static' (the lower claim), never as 'hybrid'.",
+          "items": { "type": "string", "enum": ["static", "llm"] },
+          "uniqueItems": true
+        },
+        "static_ruleset_version": { "type": "string", "description": "Version of the deterministic ruleset that ran. Present when the static tier ran; tells a verifier which ruleset to re-run to reproduce the static findings." },
         "checklist_version": { "type": "string" },
         "reference_set": { "type": "string", "description": "hash or marker of the references/ set loaded" },
         "generated_at": { "type": "string", "description": "ISO date (UTC) the report was generated" }

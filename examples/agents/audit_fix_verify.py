@@ -61,8 +61,9 @@ def main():
     else:
         _heading(2, "audit_package — SKIPPED (no key); driving the rest from the static report")
         report_path = os.path.join(tempfile.mkdtemp(prefix="sak-demo-"), "report.json")
-        demo_report = sak_lib.build_report(static["findings"])
-        demo_report["kit"]["model"] = "static-only"  # the harness stamps provenance; mirror it so the level is honest
+        # Pass the package dir so build_report stamps real provenance (source_hash, tiers,
+        # kit version). Without it the report has no anchor and attestation_payload refuses it.
+        demo_report = sak_lib.build_report(static["findings"], pkg)
         with open(report_path, "w", encoding="utf-8") as fh:
             json.dump(demo_report, fh, indent=2)
     print(f"report.json -> {report_path}")
@@ -100,8 +101,9 @@ def main():
     # 7. Optional L3 — bind this run to an on-chain attestation payload.
     _heading(7, "attestation_payload (optional, free) — the L3 bridge")
     payload = mcp_server.attestation_payload(report_path)["payload"]
-    note = " (empty: a raw static report isn't provenance-stamped; ./audit.sh stamps source_hash)"
-    print(f"  level={payload['level']} source_hash={payload['source_hash'] or '<none>' + note}")
+    print(f"  mode={payload['mode']} source_hash={payload['source_hash'][:16]}…")
+    print("  (mode is what RAN. The L1/L2/L3 rung is computed by the reader from this plus")
+    print("   attester identity — see docs/attestation-levels.md.)")
 
     print("\nDone. This is a pre-audit loop — it makes a human audit cheaper, it does not replace one.")
     return 0

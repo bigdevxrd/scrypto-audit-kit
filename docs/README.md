@@ -15,6 +15,7 @@ Start with what you want to do.
 | Run only the free, deterministic rules (no API key) | [static-analysis.md](static-analysis.md) |
 | Pick or plug in the LLM engine (claude-api · aider · your own agent) | [backends.md](backends.md) |
 | Gate every PR on a pre-audit and show a badge | [ci.md](ci.md) |
+| Read an attestation honestly — what it proves, and what rung it earns | [attestation-levels.md](attestation-levels.md) |
 
 ## Build on it
 

@@ -3,6 +3,9 @@
   "kit": {
     "version": "0.1.0",
     "model": "anthropic/claude-sonnet-4-6",
+    "tiers": [
+      "llm"
+    ],
     "checklist_version": "1.0",
     "generated_at": "2026-06-13",
     "reference_set": "6 files"
@@ -15,7 +18,7 @@
   },
   "summary": {
     "overall_risk": "critical",
-    "one_liner": "Toy yield vault with two unprivileged fund-drain paths (public emergency drain and public oracle), deposit math that panics on the first deposit, and a pause that does not cover withdrawals — illustrative fixture, do not deploy.",
+    "one_liner": "Toy yield vault with two unprivileged fund-drain paths (public emergency drain and public oracle), deposit math that panics on the first deposit, and a pause that does not cover withdrawals \u2014 illustrative fixture, do not deploy.",
     "asset_inventory": [
       "XRD vault: self.vault (src/lib.rs:37, initialised src/lib.rs:60)",
       "share token: minted on deposit (src/lib.rs:38, src/lib.rs:90)",
@@ -26,7 +29,7 @@
       "PUBLIC: deposit, withdraw, set_oracle_price, emergency_drain (src/lib.rs:26-30)"
     ],
     "external_dependencies": [
-      "none — the oracle is an internal struct field, not an external component (src/lib.rs:40)"
+      "none \u2014 the oracle is an internal struct field, not an external component (src/lib.rs:40)"
     ]
   },
   "findings": [
@@ -50,7 +53,7 @@
       "location": "src/lib.rs:111",
       "title": "set_oracle_price is public, single-source, and unchecked",
       "what": "Anyone can call set_oracle_price (src/lib.rs:29) to set any price with no staleness or sanity bound, then deposit/withdraw against it in the same transaction.",
-      "why": "An attacker sets a favourable price, mints or redeems shares, and extracts value — a second drain path independent of F-001.",
+      "why": "An attacker sets a favourable price, mints or redeems shares, and extracts value \u2014 a second drain path independent of F-001.",
       "suggested_direction": "Make price updates privileged, source from a real multi-source oracle, and add staleness and deviation bounds before a price is usable.",
       "confidence": "high",
       "status": "open",
@@ -88,7 +91,7 @@
       "class": "Time / epoch checks",
       "location": "src/lib.rs:132",
       "title": "unpause epoch check is off by one",
-      "what": "The assert requires current_epoch > unlock_epoch (src/lib.rs:132) — one epoch — but the message and intent promise two full epochs.",
+      "what": "The assert requires current_epoch > unlock_epoch (src/lib.rs:132) \u2014 one epoch \u2014 but the message and intent promise two full epochs.",
       "why": "The minimum-pause window is half what is documented, weakening the delay the brake is meant to provide.",
       "suggested_direction": "Compare against unlock_epoch + 2 and add an at-boundary test so the enforced delay matches intent.",
       "confidence": "high",
@@ -241,7 +244,7 @@
     }
   ],
   "test_coverage_gaps": [
-    "withdraw has zero tests — tests/vault.rs exercises only deposit (tests/vault.rs:13)",
+    "withdraw has zero tests \u2014 tests/vault.rs exercises only deposit (tests/vault.rs:13)",
     "no auth-violation test for set_fee_bps/pause/unpause (negative path untested)",
     "no 'withdraw while paused' test (would catch F-004)",
     "set_oracle_price and emergency_drain have no tests at all",

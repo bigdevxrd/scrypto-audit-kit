@@ -1,10 +1,17 @@
 //! Scrypto Pre-Audit Attestation Registry — the L3 trust primitive for scrypto-audit-kit.
 //!
 //! Records an on-ledger claim: "scrypto-audit-kit <kit_version> (checklist <checklist_version>)
-//! produced report <report_hash> over source <source_hash>, at <level>, with these severity counts,
-//! at epoch E." It is NOT a safety guarantee. The `source_hash` is the stable anchor; static-tier
-//! findings are reproducible from it, but the L2 LLM pass is non-deterministic, so `report_hash` is
-//! a tamper-evidence fingerprint of one archived report, not a re-derivable value.
+//! produced report <report_hash> over source <source_hash>, running <mode>, with these severity
+//! counts, at epoch E." It is NOT a safety guarantee. The `source_hash` is the stable anchor;
+//! static-tier findings are reproducible from it (re-run `static_ruleset_version`), but the LLM
+//! pass is non-deterministic, so `report_hash` is a tamper-evidence fingerprint of one archived
+//! report, not a re-derivable value.
+//!
+//! It records FACTS, never a trust level. `mode` says which analysis ran ("static" | "llm" |
+//! "hybrid"), enum-checked so garbage is unrepresentable. The L1/L2/L3 ladder in VISION.md is a different
+//! axis — who WITNESSED the run — and is computed off-ledger by the reader from mode + attester
+//! identity + `issuer_verified`, per docs/attestation-levels.md. Recording an L-number here would
+//! be self-referential: L3 *is* the existence of this record, so it can never be an input to it.
 //!
 //! Attestation is permissionless: a self-attestation proves only that someone wrote these bytes
 //! on-ledger, NOT that the kit was run. The meaningful trust signal is `issuer_verified`, set by a
@@ -24,7 +31,11 @@ pub struct AttestationData {
     pub wasm_hash: String,          // sha256 (hex) of the built blueprint wasm ("" if unknown)
     pub kit_version: String,
     pub checklist_version: String,
-    pub level: String,              // "L1-static" | "L2-hybrid" | ...
+    /// What analysis RAN: "static" | "llm" | "hybrid". A fact, not a trust level — see the
+    /// note above `attest` on why no L-number is recorded here.
+    pub mode: String,
+    /// Version of the deterministic ruleset, so a verifier knows which rules to re-run.
+    pub static_ruleset_version: String,
     pub critical: u16,
     pub high: u16,
     pub medium: u16,
@@ -43,7 +54,8 @@ pub struct AttestationInput {
     pub wasm_hash: String,
     pub kit_version: String,
     pub checklist_version: String,
-    pub level: String,
+    pub mode: String,
+    pub static_ruleset_version: String,
     pub critical: u16,
     pub high: u16,
     pub medium: u16,
@@ -56,7 +68,7 @@ pub struct AttestationCreated {
     pub attestation_id: u64,
     pub source_hash: String,
     pub report_hash: String,
-    pub level: String,
+    pub mode: String,
     pub critical: u16,
     pub high: u16,
 }
@@ -140,6 +152,17 @@ mod attestation_registry {
         pub fn attest(&mut self, input: AttestationInput) -> Bucket {
             assert!(!input.source_hash.is_empty(), "source_hash is required");
             assert!(!input.report_hash.is_empty(), "report_hash is required");
+            // `mode` is a closed set, so garbage is unrepresentable on-ledger. This is the one
+            // claim-shaped field left, and the enum check is what keeps it a fact rather than a
+            // free-text assertion. NOTE what is deliberately absent: a trust LEVEL. An L-number
+            // records who witnessed a run, which a self-attestation cannot establish about
+            // itself — "L3-attested" as an input is circular, since L3 *is* this record
+            // existing. The reader derives the rung from mode + attester + issuer_verified.
+            assert!(
+                input.mode == "static" || input.mode == "llm" || input.mode == "hybrid",
+                "mode must be \"static\", \"llm\" or \"hybrid\", got {:?}",
+                input.mode
+            );
 
             self.count += 1;
             let id = NonFungibleLocalId::integer(self.count);
@@ -149,7 +172,8 @@ mod attestation_registry {
                 wasm_hash: input.wasm_hash,
                 kit_version: input.kit_version,
                 checklist_version: input.checklist_version,
-                level: input.level.clone(),
+                mode: input.mode.clone(),
+                static_ruleset_version: input.static_ruleset_version,
                 critical: input.critical,
                 high: input.high,
                 medium: input.medium,
@@ -165,7 +189,7 @@ mod attestation_registry {
                 attestation_id: self.count,
                 source_hash: input.source_hash,
                 report_hash: input.report_hash,
-                level: input.level,
+                mode: input.mode,
                 critical: input.critical,
                 high: input.high,
             });

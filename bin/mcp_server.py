@@ -207,24 +207,27 @@ def propose_tests(package_path: str) -> dict:
 
 
 def attestation_payload(report_path: str, component: str = "", account: str = "",
-                        wasm_path: str = "", level: str = "") -> dict:
+                        wasm_path: str = "") -> dict:
     """Build the on-chain attestation payload (and manifest) from a report — free, no API.
 
-    Bridges a pre-audit report to the L3 attestation registry: computes the source/report/wasm
-    hashes, severity counts, and level, and (when a component + account are given) renders a Radix
-    transaction manifest that calls attest(). See the attestation/ blueprint.
+    Bridges a pre-audit report to the attestation registry: computes the source/report/wasm
+    hashes, severity counts and the mode that ran, and (when a component + account are given)
+    renders a Radix transaction manifest that calls attest(). See the attestation/ blueprint.
+
+    Records facts, never a trust level: `mode` is static | llm | hybrid. The L1/L2/L3 rung is
+    the reader's to compute (docs/attestation-levels.md). Raises if the report has no
+    source_hash anchor rather than emitting an unattestable payload.
 
     Args:
         report_path: Path to a report.json.
         component: Deployed attestation registry component address (for the manifest).
         account: Your account address (for the manifest).
         wasm_path: Optional path to the built blueprint wasm to hash.
-        level: Optional override for the derived level.
 
     Returns:
         {payload, manifest?} — manifest is included when both component and account are given.
     """
-    payload = attest.build_payload(report_path, wasm_path, level)
+    payload = attest.build_payload(report_path, wasm_path)
     result = {"payload": payload}
     if component and account:
         result["manifest"] = attest.render_manifest(payload, component, account)

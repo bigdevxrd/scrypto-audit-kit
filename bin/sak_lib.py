@@ -5,12 +5,89 @@ these so the same logic is used everywhere and is unit-tested in tests/test_sak_
 
 Everything operates on a report dict shaped by schema/audit-report.schema.json.
 """
+import datetime
 import glob
+import hashlib
 import json
 import os
 
 SEV_RANK = {"info": 1, "low": 2, "medium": 3, "high": 4, "critical": 5}
 SEV_ORDER = ["critical", "high", "medium", "low", "info"]
+
+# The two tiers a run can execute. `tiers` is a FACT about a run — which analyses actually ran —
+# and is the only thing attest.py may derive an attestation mode from. Deliberately not the same
+# vocabulary as the L1/L2/L3 trust ladder in VISION.md: that ladder is about who WITNESSED a run,
+# which is a different axis (see docs/attestation-levels.md).
+TIER_STATIC = "static"
+TIER_LLM = "llm"
+
+
+def _kit_root():
+    """The kit checkout root, if we are running from one (bin/ sits one level below it)."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def kit_version():
+    """Kit version: the VERSION file of a real kit clone, else the installed metadata.
+
+    The VERSION file is trusted only beside an `audit.sh` — installed, the sibling directory is
+    site-packages, which we do not own, and this string is stamped into report provenance.
+    """
+    root = _kit_root()
+    if os.path.isfile(os.path.join(root, "audit.sh")):
+        try:
+            with open(os.path.join(root, "VERSION"), encoding="utf-8") as fh:
+                return fh.read().strip()
+        except OSError:
+            pass
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+        try:
+            return version("scrypto-audit-kit")
+        except PackageNotFoundError:
+            return "unknown"
+    except ImportError:
+        return "unknown"
+
+
+def target_files(pkg_dir):
+    """The files a run analyzes, in the exact order audit.sh feeds them to sha256.
+
+    Mirrors audit.sh's TARGET_FILES: Cargo.toml, then every .rs under src/ sorted, then every
+    .rs under tests/ sorted (only when tests/ exists). The ordering is load-bearing — it defines
+    source_hash, which is the anchor an on-chain attestation binds to, so this function and the
+    shell must never drift. tests/test_attest.py pins them against each other.
+    """
+    files = [os.path.join(pkg_dir, "Cargo.toml")]
+    for sub in ("src", "tests"):
+        base = os.path.join(pkg_dir, sub)
+        if not os.path.isdir(base):
+            continue
+        found = []
+        for root, _dirs, names in os.walk(base):
+            found.extend(os.path.join(root, n) for n in names if n.endswith(".rs"))
+        files.extend(sorted(found))
+    return files
+
+
+def source_hash(pkg_dir):
+    """sha256 (hex) of the analyzed source, concatenated — the anchor an attestation binds to.
+
+    Byte-identical to audit.sh's SOURCE_HASH, including its `cat ... 2>/dev/null` behaviour of
+    silently skipping a file it cannot read. Returns "" when nothing was readable, so callers
+    can fail closed on a missing anchor rather than attesting to nothing.
+    """
+    h = hashlib.sha256()
+    read_any = False
+    for path in target_files(pkg_dir):
+        try:
+            with open(path, "rb") as fh:
+                for chunk in iter(lambda: fh.read(65536), b""):
+                    h.update(chunk)
+            read_any = True
+        except OSError:
+            continue  # `cat` skips unreadable files too
+    return h.hexdigest() if read_any else ""
 
 
 def load_report(path):
@@ -258,17 +335,47 @@ def merge_findings(primary, extra):
     return merged
 
 
-def build_report(findings):
-    """Assemble a minimal schema-shaped report dict from a findings list alone — used when
-    there is no LLM pass (the static-only tier). Provenance (kit/target) is stamped separately."""
+def build_report(findings, pkg_dir=None):
+    """Assemble a schema-shaped report dict from a findings list alone — the static-only tier.
+
+    Pass `pkg_dir` (the package that was analyzed) to get a report that is complete and
+    schema-VALID on its own, including the `target.source_hash` anchor an attestation needs.
+    That is the pip-only path docs/sdk.md documents; without it there is no stamper in the
+    installed package and the resulting payload cannot be attested.
+
+    Omitting `pkg_dir` keeps the historical behaviour — empty kit/target for a caller that
+    stamps its own provenance afterwards, which is what extract_report.py does on the clone
+    path. It yields a deliberately INCOMPLETE report; attest.build_payload refuses it rather
+    than attesting to a missing anchor.
+    """
     by_class = {}
     for f in findings:
         by_class.setdefault(f.get("class", "?"), []).append(f.get("id", "?"))
     coverage = [{"class": c, "status": "findings", "findings": ids} for c, ids in sorted(by_class.items())]
+
+    kit, target = {}, {}
+    if pkg_dir is not None:
+        pkg_dir = os.path.abspath(pkg_dir)
+        kit = {
+            "version": kit_version(),
+            "model": "static-only",
+            # The fact that drives the attestation mode. Only the static tier ran here, by
+            # construction — this function is what "no LLM pass" means.
+            "tiers": [TIER_STATIC],
+            "checklist_version": "n/a",  # no checklist walk happens in the static-only tier
+            "generated_at": datetime.datetime.now(datetime.timezone.utc)
+                                    .strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        target = {
+            "repo": os.path.basename(os.path.dirname(pkg_dir)),
+            "package": os.path.basename(pkg_dir),
+            "source_hash": source_hash(pkg_dir),
+            "files_analyzed": len([p for p in target_files(pkg_dir) if os.path.isfile(p)]),
+        }
     return {
         "schema_version": "1.0",
-        "kit": {},
-        "target": {},
+        "kit": kit,
+        "target": target,
         "summary": {
             "overall_risk": worst_severity(findings) or "info",
             "one_liner": f"Static-only pre-audit: {len(findings)} deterministic finding(s). "
