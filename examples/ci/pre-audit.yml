@@ -22,17 +22,18 @@ jobs:
     # Two refs, both worth pinning: this one picks the workflow, `kit-ref` picks the audit code
     # it checks out. Bump them together when you want newer checks.
     #
-    # v0.7.0 is a floor, not just the newest tag. v0.5.0 and v0.6.0 ship a pre-audit.yml that
-    # interpolates caller inputs straight into `run:` scripts — a crafted `model`/`fail-on` value
-    # executes in the job holding your ANTHROPIC_API_KEY. v0.6.0 additionally defaults to the
-    # claude-api backend while installing only aider, so its default run dies mid-audit on a
-    # missing anthropic. If v0.7.0 is not tagged yet, pin a commit SHA from the kit's main
-    # rather than falling back to an older tag.
-    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.7.0
+    # v0.7.1 is a floor, not just the newest tag — every earlier tag lets the package you are
+    # auditing run code in your CI job. v0.7.0 and earlier probe the backend with
+    # `python3 -c 'import anthropic'` in the AUDITED tree, and python puts the cwd on sys.path
+    # for -c, so a package shipping its own anthropic.py executes one step before your
+    # ANTHROPIC_API_KEY enters the job (and satisfies the probe, so the guard passes anyway).
+    # v0.5.0/v0.6.0 additionally interpolate caller inputs into `run:` scripts. If v0.7.1 is not
+    # tagged yet, pin a commit SHA from the kit's main rather than falling back to an older tag.
+    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.7.1
     with:
       package: packages/my-blueprint   # ← change to your package path
       fail-on: high                     # block on high + critical; use `critical` to be lenient
-      kit-ref: v0.7.0                   # the audit code; defaults to main (unpinned) if omitted
+      kit-ref: v0.7.1                   # the audit code; defaults to main (unpinned) if omitted
       # model: claude                   # claude is the only value CI can authenticate; the
       #                                 # deepseek/both cross-model modes need a DEEPSEEK_API_KEY
       #                                 # this workflow never forwards — see docs/ci.md

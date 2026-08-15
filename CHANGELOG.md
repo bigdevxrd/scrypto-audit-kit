@@ -4,6 +4,68 @@ Notable changes to scrypto-audit-kit. The kit version lives in [VERSION](VERSION
 stamped into every report; this log follows [Keep a Changelog](https://keepachangelog.com) and
 [SemVer](https://semver.org). The kit was built in a compressed timeline — dates reflect that.
 
+## [0.7.1] — 2026-08-15 — the rest of the CI hole, and a distribution that works
+
+v0.7.0 closed argument injection in the reusable workflow. A post-release adversarial sweep found
+the **same bug class still open one step later in the same file**, plus an analyzer that failed
+open and a distribution that could not test itself. **`v0.7.1` supersedes `v0.7.0` as the floor
+for CI callers.**
+
+### Fixed
+
+- **Code execution in the pre-audit job, one step before your API key enters it**
+  ([.github/workflows/pre-audit.yml](.github/workflows/pre-audit.yml)) — **critical**. The
+  backend-install step ran `python3 -c 'import anthropic'` with the *audited* repository as its
+  working directory. CPython puts the cwd on `sys.path` for `-c`, so a package under audit that
+  ships its own `anthropic.py` got arbitrary execution in the caller's runner — and, because the
+  payload satisfies the import, the guard *passed* while it ran. The next step is the one holding
+  `ANTHROPIC_API_KEY`, and the payload can rewrite `audit.sh` or `$GITHUB_PATH` before it. Two
+  independent fixes, either sufficient: the untrusted checkout now lands under `target/` so the
+  workspace root is never attacker-owned, and the probe runs with `-P`. Secret theft needs the
+  key present (so not fork PRs on public repos, but fully applies to private repos — the kit's
+  core audience); **gate bypass applies to every caller**, since code execution before the gate
+  step can neutralise the gate judging it. Both properties are pinned by tests.
+- **`sak-static` reported a clean scan of packages it never opened** ([bin/static_analysis.py](bin/static_analysis.py))
+  — **high**. `os.walk()` on a missing path yields nothing and raises nothing, so a typo'd,
+  renamed, or wrong-cwd package path produced `{"count": 0}` and exit `0`. A build stayed green
+  because the analyzer read *nothing*. It now fails closed on a missing directory and on a package
+  with no `.rs` files, with `--allow-empty` as the explicit opt-out — matching `sak-gate`, which
+  has always failed closed on a missing reports dir. The two entry points in one wheel no longer
+  ship opposite safety defaults.
+
+### Changed
+
+- **The sdist can build and test itself** (new [MANIFEST.in](MANIFEST.in)) — **high**. setuptools'
+  distutils-era defaults shipped `bin/*.py` and `test*.py` and nothing else: no `tests/__init__.py`
+  (so `unittest discover` could not even import the suite), no `schema/`, `prompts/`, or
+  `examples/`. Unpacking the v0.7.0 sdist and running the project's own documented test command
+  died immediately, and after that 27 tests failed on absent fixtures. Downstream packagers
+  (conda-forge, Debian, Nix, corporate mirrors) build from the sdist by convention, and for a
+  security tool it is also how someone verifies from source that the artifact matches the repo.
+  The sdist now runs its full 205-test suite green.
+- **The `[mcp]` and `[dev]` extras are installable on the Python version we claim to support**
+  ([pyproject.toml](pyproject.toml)) — **high**. Every published `mcp` release requires 3.10+,
+  but `requires-python` is `>=3.8` and the wheel is `py3-none-any`, so pip served it to 3.8/3.9
+  users and then failed with an unresolvable `No matching distribution found for mcp[cli]`. A
+  contributor on the declared floor could not install the `[dev]` extras the test suite needs.
+  An environment marker now resolves the extra to nothing there instead of erroring.
+- **Releases are gated on the tagged tree passing** ([.github/workflows/release.yml](.github/workflows/release.yml)).
+  `lint.yml` runs on push and PR to `main`, never on tags, so nothing tied a published PyPI
+  artifact to a commit CI had gone green on. The release workflow now runs the suite against the
+  exact tagged tree first, then smoke-tests the built wheel and sdist — install, version match,
+  console scripts, and the sdist's own suite — before the irreversible upload.
+- **Least-privilege tokens and a job timeout.** `lint.yml` and `blueprint.yml` declare
+  `permissions: contents: read` instead of inheriting a repo-wide web setting, and the reusable
+  pre-audit job caps at 30 minutes so a hostile package cannot burn a caller's runner minutes.
+
+### Added
+
+- Regression tests for both security fixes ([tests/test_security.py](tests/test_security.py)) —
+  8 new cases, 205 total. They pin the analyzer's fail-closed behaviour, assert no `python3 -c`
+  runs without `-P` in any workflow, assert the untrusted checkout stays out of the workspace
+  root, and *demonstrate the attack itself* so a future "`-P` looks like cargo-culting" cleanup
+  fails loudly.
+
 ## [0.7.0] — 2026-08-15 — CI hardening and rule precision
 
 The reusable CI workflow is the headline: it took caller input into `run:` scripts in the job

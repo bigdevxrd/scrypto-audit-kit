@@ -12,8 +12,27 @@ permissions:
   contents: read
 
 jobs:
+  # Gate the publish on the tagged tree actually passing. lint.yml runs on push/PR to main, not
+  # on tags, so before this job existed nothing verified that the commit behind a tag was the
+  # commit CI went green on — a tag pointed at any commit would publish unchecked code to PyPI
+  # under a trusted-publishing identity. Re-running the suite HERE, against the exact tagged
+  # tree, is what ties the artifact to a tested state.
+  verify:
+    name: test the tagged tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -t .
+      - name: Shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck && shellcheck audit.sh
+
   pypi:
     name: build + publish to PyPI
+    needs: verify
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -44,6 +63,22 @@ jobs:
         run: |
           python -m pip install --upgrade build
           python -m build
+
+      - name: Smoke-test the artifacts before publishing
+        # Publishing is irreversible: a version number on PyPI can be yanked but never reused.
+        # Check the artifacts we are about to upload, not the repo they came from — v0.7.0 shipped
+        # an sdist whose own test suite could not run, and nothing here would have caught it.
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/*.whl
+          /tmp/smoke/bin/python -c "import scrypto_audit_kit as s; assert s.__version__ == open('VERSION').read().strip(), s.__version__"
+          for script in sak-static sak-gen-tests sak-attest sak-gate; do
+            /tmp/smoke/bin/$script --help > /dev/null
+          done
+          # The sdist must be able to build and test itself — that is what downstream packagers do.
+          mkdir -p /tmp/sdist && tar xzf dist/*.tar.gz -C /tmp/sdist --strip-components=1
+          cd /tmp/sdist && python3 -m unittest discover -s tests -t . 2>&1 | tail -3
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

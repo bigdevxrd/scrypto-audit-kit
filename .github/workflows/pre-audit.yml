@@ -20,7 +20,7 @@ on:
         default: high
         type: string
       kit-ref:
-        description: "scrypto-audit-kit ref to pin (tag/branch/sha). Defaults to main — pin it to the same release as the `uses:` ref, or the audit code moves under you. Floor is v0.7.0, matching the `uses:` ref: v0.6.0 defaults to the claude-api backend and v0.5.0 has no [llm] extra at all, so on either the backend install step below fails the job rather than letting it die mid-audit."
+        description: "scrypto-audit-kit ref to pin (tag/branch/sha). Defaults to main — pin it to the same release as the `uses:` ref, or the audit code moves under you. Floor is v0.7.1, matching the `uses:` ref: v0.7.0 and earlier ship a static analyzer that exits 0 on a package path it never read (a green build for an unscanned package), v0.6.0 defaults to the claude-api backend and v0.5.0 has no [llm] extra at all, so on either the backend install step below fails the job rather than letting it die mid-audit."
         required: false
         default: main
         type: string
@@ -31,6 +31,9 @@ on:
 jobs:
   pre-audit:
     runs-on: ubuntu-latest
+    # The job reads untrusted code and calls a paid API. Cap the blast radius of a package that
+    # tries to burn the caller's runner minutes (or API budget) by hanging the audit.
+    timeout-minutes: 30
     # Least privilege: a reusable workflow inherits the CALLER's token scope, so hard-cap it
     # here — the audit only reads code. (It can only downgrade the caller, never widen it.)
     permissions:
@@ -39,6 +42,13 @@ jobs:
       - name: Check out the project under audit
         uses: actions/checkout@v4
         with:
+          # Land the untrusted tree in a subdirectory, NOT at $GITHUB_WORKSPACE. The workspace
+          # root is the default cwd of every `run:` step, and CPython puts the cwd on sys.path
+          # for `python3 -c` — so with the audited code at the root, any `python3 -c 'import X'`
+          # in this job imports an attacker-supplied X.py from the package under audit. Keeping
+          # the root ours removes that whole class rather than patching it call site by call
+          # site. The audit step below resolves the caller's `package` inside this directory.
+          path: target
           # The audit reads this (untrusted) tree, it does not build it: audit.sh's compile
           # check is opt-in and this workflow never passes --compile-check. Drop the token
           # regardless — nothing downstream needs it, and it keeps the GITHUB_TOKEN out of
@@ -76,10 +86,16 @@ jobs:
           # it prints "WARNING: scrypto-audit-kit X does not provide the extra 'llm'", installs
           # without `anthropic`, and exits 0. Assert the import here, where the message can name
           # the cause, instead of letting the job go green and die later at llm_audit.py's import.
-          if ! python3 -c 'import anthropic' 2>/dev/null; then
+          #
+          # -P (PEP 370 safe path, python >= 3.11; this job pins 3.12) keeps the cwd OFF
+          # sys.path. Belt and braces with the `path: target` checkout above: without either,
+          # an audited package shipping its own anthropic.py both executes here — one step
+          # before ANTHROPIC_API_KEY enters the job — and satisfies the probe, so the guard
+          # passes while the payload runs. Never drop the -P.
+          if ! python3 -P -c 'import anthropic' 2>/dev/null; then
             echo "::error::the claude-api backend needs the 'anthropic' package and it is not installed."
             echo "kit-ref '$KIT_REF' has no [llm] extra (added in v0.6.0), so pip only warned and skipped it."
-            echo "Pin kit-ref to v0.7.0 or later, or install anthropic yourself before this workflow runs."
+            echo "Pin kit-ref to v0.7.1 or later, or install anthropic yourself before this workflow runs."
             exit 1
           fi
 
@@ -97,7 +113,10 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MODEL: ${{ inputs.model }}
-          PACKAGE: ${{ inputs.package }}
+          # `package` stays caller-relative (a path inside THEIR repo); the checkout now lands
+          # under target/, so resolve it there. audit.sh derives the report name from the
+          # package basename and its parent, both unchanged by the extra level.
+          PACKAGE: target/${{ inputs.package }}
         run: .scrypto-audit-kit/audit.sh --model "$MODEL" "$PACKAGE"
 
       - name: Upload report

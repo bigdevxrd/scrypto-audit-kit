@@ -154,7 +154,7 @@ Run the pre-audit on every PR and show a status badge — full setup in [docs/ci
 ```yaml
 jobs:
   scrypto-pre-audit:
-    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.7.0
+    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.7.1
     with:
       package: packages/my-blueprint
       fail-on: high

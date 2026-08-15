@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege: without an explicit block the token scope is whatever the repo's
+# default happens to be — a web setting that can be widened without touching this file.
+# Neither job writes anything.
+permissions:
+  contents: read
+
 jobs:
   shellcheck:
     name: shellcheck audit.sh

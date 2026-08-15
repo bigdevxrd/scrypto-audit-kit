@@ -38,10 +38,16 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-mcp = ["mcp[cli]>=1.0"]          # the MCP server (sak-mcp)
+# Every published `mcp` release requires python >= 3.10, but this project's floor is 3.8 and the
+# wheel is py3-none-any, so pip serves it to 3.8/3.9 users and then dies with an unresolvable
+# "No matching distribution found for mcp[cli]". The marker makes the extra resolve to nothing
+# there instead of erroring: the core still installs, the MCP server is simply absent — which is
+# the truth on those versions. Same for `dev`, or a contributor on the declared floor cannot
+# install the extras the test suite documents.
+mcp = ["mcp[cli]>=1.0; python_version >= '3.10'"]   # the MCP server (sak-mcp) — needs 3.10+
 schema = ["jsonschema>=4.0"]     # opt-in report/contract schema validation
 llm = ["anthropic>=0.40"]        # the default claude-api audit backend (bin/llm_audit.py)
-dev = ["jsonschema>=4.0", "mcp[cli]>=1.0"]
+dev = ["jsonschema>=4.0", "mcp[cli]>=1.0; python_version >= '3.10'"]
 
 [project.urls]
 Homepage = "https://github.com/bigdevxrd/scrypto-audit-kit"
