@@ -3,11 +3,11 @@
 **Date:** 2026-07-18
 **Roadmap item:** Phase 1 — "Direct-API structured-output mode (guaranteed-valid JSON, no markdown parse)" *(unchecked)*
 **Status:** Design spec, ready to implement. Code lives in `bin/llm_audit.py` + a small extract-path branch.
-**Author:** VPS Claude (draft only — Mac Claude implements + tests)
-**Provenance:** VPS-drafted 2026-07-18, implemented 2026-08-13. Landed as-drafted; implementation
-adaptations vs. this spec (harness integration deferred, refusal handling added, `$ref`
-inlining generalized) are noted in the PR that added `bin/llm_audit.py`'s `--structured` mode
-and in [CHANGELOG.md](../../CHANGELOG.md).
+**Author:** bigdev
+**Provenance:** A spec only — no code — written ahead of the work, then implemented against it
+on 2026-08-13. Landed as-drafted; implementation adaptations vs. this spec (harness integration
+deferred, refusal handling added, `$ref` inlining generalized) are noted in the PR that added
+`bin/llm_audit.py`'s `--structured` mode and in [CHANGELOG.md](../../CHANGELOG.md).
 
 ---
 

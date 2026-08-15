@@ -74,6 +74,16 @@ For contentious changes (e.g. fundamental restructuring of the checklist), open 
 - **Closed-source dependencies.** Everything in this kit must work with no proprietary inputs.
 - **Findings padding.** Prompt changes that make the model raise more findings to look thorough are anti-productive. We optimise for *signal*, not finding count.
 
+## Security
+
+Found a hole in the kit itself — the harness, the analyzer, the MCP server, the CI gate, the
+published package? That goes through [SECURITY.md](SECURITY.md), not a public issue or PR.
+
+A finding the kit *reported about your blueprint* is the opposite case: a false positive, a
+false negative, or a hallucinated `file:line` is the kit's output, not a vulnerability in it,
+and it belongs in an ordinary issue — see [What's most useful](#whats-most-useful) above, which
+ranks exactly those as the highest-impact thing you can send.
+
 ## Conduct
 
 See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

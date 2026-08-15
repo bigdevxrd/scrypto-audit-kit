@@ -4,7 +4,13 @@ Notable changes to scrypto-audit-kit. The kit version lives in [VERSION](VERSION
 stamped into every report; this log follows [Keep a Changelog](https://keepachangelog.com) and
 [SemVer](https://semver.org). The kit was built in a compressed timeline — dates reflect that.
 
-## [Unreleased]
+## [0.7.0] — 2026-08-15 — CI hardening and rule precision
+
+The reusable CI workflow is the headline: it took caller input into `run:` scripts in the job
+holding your API key, and — separately — never installed the backend it defaults to, so the
+default path could not have run even without the first problem. Both are fixed here, which is
+why **`v0.7.0` is a floor for CI callers, not just the newest tag**. Alongside that, the static
+tier gains two rules and loses a false positive on its Auth-bypass class.
 
 ### Added
 
@@ -18,7 +24,7 @@ stamped into every report; this log follows [Keep a Changelog](https://keepachan
   `input_schema` is unverified. Shares the cached system prefix with markdown mode, so
   switching modes doesn't cost a fresh cache fill. Design:
   [docs/design/structured-output-mode-2026-07-18.md](docs/design/structured-output-mode-2026-07-18.md)
-  (VPS-drafted 2026-07-18, implemented 2026-08-13).
+  (specced 2026-07-18, implemented 2026-08-13).
   - **Opt-in, default off.** The design calls for a markdown-vs-structured parity check
     (run both modes on the same targets, diff the JSON) before flipping the default; that
     check needs API credits the kit doesn't have right now, so it's deferred — see
@@ -31,6 +37,83 @@ stamped into every report; this log follows [Keep a Changelog](https://keepachan
   - Docs: [docs/backends.md](docs/backends.md) `--structured` section,
     [docs/architecture.md](docs/architecture.md) note on the two shared-cache output
     contracts.
+- **Two static rules** ([bin/static_analysis.py](bin/static_analysis.py)):
+  - **`owner-role-fixed`** (`low`, Upgrade safety) — `prepare_to_globalize(OwnerRole::Fixed(…))`
+    pins the owner rule for the life of the component, so a lost, burned, or compromised owner
+    badge leaves administration permanently stuck where that badge is. `low` deliberately, not
+    medium: unlike `OwnerRole::None` there *is* an authority here, so nothing is immediately
+    exploitable — what's gone is the recovery path, which is a deployment property a reviewer
+    signs off rather than a bug. Immutable administration can be a deliberate choice; waive it
+    with `// sak:allow owner-role-fixed` when it is. The kit's own
+    [attestation registry](attestation/) does *not* waive it — the rule fires there, and
+    `attestation/README.md` publishes the finding and argues why the waiver premise fails on
+    that blueprint.
+  - **`hand-rolled-address-check`** (`medium`, External calls / composability) — an address
+    validated by `.starts_with("account_rdx1")` and friends instead of a bech32m decode. A
+    prefix test accepts any attacker-chosen string of the right shape with the checksum never
+    verified, and the garbage that passes is then persisted on-ledger and trusted downstream.
+    Narrow on purpose: only a `starts_with` against a Radix HRP, and one finding per line, so
+    the usual mainnet-plus-testnet HRP pair reads as the single hand-rolled validator it is.
+    Reads the strings-kept view, so it does not fire on a prefix quoted in a comment.
+- **[SECURITY.md](SECURITY.md)** — a disclosure policy. Separates a vulnerability *in* the kit
+  from a finding the kit *reports* about your blueprint (the second is an ordinary issue, and
+  the most useful contribution there is); states response windows as honest expectations rather
+  than an SLA; and writes down both what's out of scope and what the kit does not defend
+  against, so nobody has to discover either via an advisory. A private GitHub security advisory
+  is the preferred channel, with a fallback that stays reachable while private vulnerability
+  reporting is switched off on the repo — as it is today, which the file says out loud instead
+  of assuming. There is no bounty. Discoverable from [CONTRIBUTING.md](CONTRIBUTING.md) and the
+  [docs index](docs/README.md), and added to the markdownlint lists in
+  [.github/workflows/lint.yml](.github/workflows/lint.yml) and the [Makefile](Makefile) — it
+  was the one root `.md` neither list named, so it could have drifted silently.
+
+### Fixed
+
+- **The reusable CI workflow never ran its own default backend.**
+  [.github/workflows/pre-audit.yml](.github/workflows/pre-audit.yml) installed aider and
+  nothing else, but `audit.sh` has defaulted to the `claude-api` backend since 0.6.0, and that
+  backend imports `anthropic` ([bin/llm_audit.py](bin/llm_audit.py)). `pipx install aider-chat`
+  puts aider in its own virtualenv and leaves the runner's `python3` without `anthropic`, while
+  `audit.sh`'s pre-flight for this backend only checks that `python3` exists — so every default
+  run cleared the pre-flight and then exited 2 at the import guard, after the checkouts and the
+  toolchain setup. Nobody hit it in the kit's own CI because the kit does not call its own
+  reusable workflow. The workflow now installs the kit with its `[llm]` extra, and installs
+  aider only for `model: deepseek | both`, the cross-model modes that actually need it.
+- **`public-mint-burn` fired on OWNER-restricted methods.** The rule matched `pub fn` plus a
+  mint/burn-shaped name and stopped there — it never read `enable_method_auth!`, which is where
+  a Scrypto method's gate actually lives (`pub fn` is how *every* blueprint method is written,
+  gated or not). A component whose auth block said
+  `mint_manager_badge => restrict_to: [admin, OWNER];` was still reported as an unrestricted
+  mint: a `medium` raised against correct code, on an Auth-bypass rule, which is exactly the
+  kind of noise that teaches a reader to skim the class. Matches are now resolved against their
+  own blueprint's `enable_method_auth!` — scoped per `#[blueprint]` for the same reason
+  `missing-method-auth` was in 0.6.0, so one blueprint's rules never speak for a sibling in the
+  same `.rs`. A method declared `=> PUBLIC`, or absent from the macro, or in a blueprint with no
+  auth macro at all, still fires, and the finding now names which of those it is. A restriction
+  that exists only inside a comment does not suppress. The new `_method_auth_index` helper reads
+  only the `methods { … }` sub-block, because the sibling `roles { … }` block uses the identical
+  `name => …;` shape and would otherwise register roles as methods.
+
+### Security
+
+- **Argument and command injection in the reusable `pre-audit.yml` workflow.** It interpolated
+  caller-controlled `${{ inputs.model }}`, `${{ inputs.package }}` and `${{ inputs.fail-on }}`
+  directly into `run:` scripts. GitHub substitutes those values into the script text *before*
+  bash parses it, so an input carrying shell metacharacters executes as commands in the audit
+  job — and two of the three sat in the step that has `ANTHROPIC_API_KEY` in its environment
+  (the third in the gate step of the same job, on the same runner). All three now pass through
+  `env:` and are referenced as quoted shell variables, the same fix the release workflow got in
+  0.5.0. `kit-ref` stays interpolated on purpose: it feeds `actions/checkout`'s `ref:` input,
+  which the runner hands to that action's JavaScript, which execs `git` with an argv array — no
+  shell parses it.
+  - **Callers pinned at `v0.6.0` or earlier are affected and should bump to `v0.7.0`.** What
+    it's worth to an attacker depends on where your inputs come from: a literal in your own YAML
+    is not reachable, an input derived from a fork's PR, a branch name, or another workflow's
+    output is.
+  - `kit-ref`'s description now says it defaults to `main` — pinning only the `uses:` ref leaves
+    the audit code itself unpinned, which the CI docs and the example caller now spell out too.
+
+Tests: 169 → 197 green.
 
 ## [0.6.0] — 2026-07-17 — Interchangeable LLM backends
 

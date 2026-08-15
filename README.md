@@ -154,15 +154,18 @@ Run the pre-audit on every PR and show a status badge — full setup in [docs/ci
 ```yaml
 jobs:
   scrypto-pre-audit:
-    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@main
+    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.7.0
     with:
       package: packages/my-blueprint
       fail-on: high
+      kit-ref: v0.7.0   # pin the audit code too — it defaults to main
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-It compiles, audits, uploads the report, and fails on High/Critical findings — an honest "pre-audit passing" signal, not a safety guarantee.
+It audits, uploads the report, and fails on High/Critical findings — an honest "pre-audit passing" signal, not a safety guarantee. It does **not** compile your package: the `cargo` pre-flight is opt-in (`--compile-check`) and this workflow never passes it.
+
+Pin **v0.7.0 or later** — that is the release carrying the workflow fix. The `v0.5.0` and `v0.6.0` tags interpolate caller inputs into `run:` scripts inside the job that holds your `ANTHROPIC_API_KEY`; [docs/ci.md](docs/ci.md) has the detail and the SHA-pinning fallback if v0.7.0 is not tagged yet.
 
 ### Use it from an agent (MCP + Claude Code)
 
@@ -235,6 +238,7 @@ Everything is in **[docs/](docs/README.md)**; the short list:
 - [sdk.md](docs/sdk.md) — the Python API + console scripts
 - [ci.md](docs/ci.md) — CI gate + badge
 - [architecture.md](docs/architecture.md) — how the pieces fit together
+- [SECURITY.md](SECURITY.md) — reporting a vulnerability *in the kit* (not a finding it reported)
 - [VISION.md](VISION.md) · [ROADMAP.md](ROADMAP.md) · [CHANGELOG.md](CHANGELOG.md) — strategy, status, history
 
 ## Limitations — read this before relying on the output

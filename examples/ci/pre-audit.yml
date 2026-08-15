@@ -19,11 +19,22 @@ jobs:
   scrypto-pre-audit:
     # Pin the kit to a release tag/SHA for reproducible, supply-chain-safe runs (not @main —
     # that runs whatever is on the kit's HEAD in your CI, with your ANTHROPIC_API_KEY in reach).
-    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@main
+    # Two refs, both worth pinning: this one picks the workflow, `kit-ref` picks the audit code
+    # it checks out. Bump them together when you want newer checks.
+    #
+    # v0.7.0 is a floor, not just the newest tag. v0.5.0 and v0.6.0 ship a pre-audit.yml that
+    # interpolates caller inputs straight into `run:` scripts — a crafted `model`/`fail-on` value
+    # executes in the job holding your ANTHROPIC_API_KEY. v0.6.0 additionally defaults to the
+    # claude-api backend while installing only aider, so its default run dies mid-audit on a
+    # missing anthropic. If v0.7.0 is not tagged yet, pin a commit SHA from the kit's main
+    # rather than falling back to an older tag.
+    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.7.0
     with:
       package: packages/my-blueprint   # ← change to your package path
       fail-on: high                     # block on high + critical; use `critical` to be lenient
-      # model: claude                   # or deepseek (cheaper) / both (cross-model)
-      # kit-ref: v0.1.0                 # pin the kit to a release for reproducible runs
+      kit-ref: v0.7.0                   # the audit code; defaults to main (unpinned) if omitted
+      # model: claude                   # claude is the only value CI can authenticate; the
+      #                                 # deepseek/both cross-model modes need a DEEPSEEK_API_KEY
+      #                                 # this workflow never forwards — see docs/ci.md
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

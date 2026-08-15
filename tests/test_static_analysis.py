@@ -136,10 +136,16 @@ class TestNewRules(unittest.TestCase):
         self.assertIn("public-mint-burn", {r for r, _ in fired("pub fn mint(&mut self) {}")})
         self.assertIn("public-mint-burn", {r for r, _ in fired("pub fn burn_tokens(&mut self) {}")})
 
-    def test_attestation_blueprint_still_clean(self):
-        # dogfood: the kit's own L3 blueprint must stay 0-findings under the static tier
-        import static_analysis as sa
-        self.assertEqual(sa.analyze_package(os.path.join(ROOT, "attestation")), [])
+    def test_attestation_blueprint_only_fixed_owner(self):
+        # Dogfood: the kit's own L3 blueprint carries exactly one static finding — owner-role-fixed
+        # (low) at attestation/src/lib.rs:130, where prepare_to_globalize pins the owner rule.
+        # It is a true positive and it is left unwaived: the registry's *record* is deliberately
+        # immutable (soulbound, no burn), but its *administration* is not — the OWNER can already
+        # re-point `issuer`, so Fixed only removes the path to re-point the OWNER rule itself.
+        # attestation/README.md publishes this finding instead of a "0 findings" claim; if that
+        # design decision is ever revisited, change the blueprint and this assertion together.
+        findings = sa.analyze_package(os.path.join(ROOT, "attestation"))
+        self.assertEqual([(f["rule"], f["severity"]) for f in findings], [("owner-role-fixed", "low")])
 
 
 class TestEvasionsFixed(unittest.TestCase):
@@ -199,6 +205,15 @@ class TestEvasionsFixed(unittest.TestCase):
 
     def test_hardcoded_address_not_in_comment(self):
         self.assertEqual(fired("// see pool_rdx1qcdefghjkmnpqrstuvwxyz23456789"), set())
+
+    def test_hand_rolled_address_check_raw_string_caught(self):
+        # the pattern anchored on a literal `"`, so a raw string slipped past this rule while the
+        # sibling hardcoded-address still matched inside one — the stripper keeps raw-string
+        # contents under keep_strings, so this was a rule inconsistency, not a stripper limit.
+        self.assertIn("hand-rolled-address-check",
+                      {r for r, _ in fired('if a.starts_with(r#"account_rdx1"#) { ok() }')})
+        self.assertIn("hand-rolled-address-check",
+                      {r for r, _ in fired('if a.starts_with(r"account_rdx1") { ok() }')})
 
 
 class TestBugHunt20260718(unittest.TestCase):
@@ -267,6 +282,215 @@ mod b {
         # both alternatives (the plain-suffix one requires `f32/64` directly after the digits).
         self.assertIn(("float-usage", 1), fired("let x = 1e5f64;"))
         self.assertIn(("float-usage", 1), fired("let y = 1.5e3f32;"))
+
+
+class TestPublicMintBurnConsultsAuthBlock(unittest.TestCase):
+    """public-mint-burn must read enable_method_auth! before it fires.
+
+    The rule matched `pub fn \\w*(mint|burn)\\w*` and never looked at the auth block, so a
+    method the SAME file declares `restrict_to: [...]` was reported as an unrestricted mint.
+    That is what it did to a live mainnet component (scrypto-xrd wallet-manager), whose
+    `mint_manager_badge => restrict_to: [admin, OWNER];` sits a few lines above the struct.
+    """
+
+    # The shape of the real blueprint, trimmed: a roles block, an interleaved comment, and a
+    # methods block declaring one PUBLIC read and one restricted mint.
+    RESTRICTED = """#[blueprint]
+mod wallet_manager {
+    enable_method_auth! {
+        roles {
+            admin => updatable_by: [OWNER];
+        },
+        methods {
+            // Public reads
+            get_badge_info => PUBLIC;
+            // Admin/owner only
+            mint_manager_badge => restrict_to: [admin, OWNER];
+        }
+    }
+    struct WalletManager {}
+    impl WalletManager {
+        pub fn get_badge_info(&self) {}
+        pub fn mint_manager_badge(&mut self, name: String) -> Bucket {}
+    }
+}
+"""
+
+    def test_restricted_mint_does_not_fire(self):
+        self.assertNotIn("public-mint-burn", {r for r, _ in fired(self.RESTRICTED)})
+
+    def test_public_mint_still_fires(self):
+        src = self.RESTRICTED.replace("restrict_to: [admin, OWNER]", "PUBLIC")
+        self.assertIn("public-mint-burn", {r for r, _ in fired(src)})
+
+    def test_restricted_burn_does_not_fire(self):
+        src = self.RESTRICTED.replace("mint_manager_badge", "burn_manager_badge")
+        self.assertNotIn("public-mint-burn", {r for r, _ in fired(src)})
+
+    def test_wrapped_restrict_list_still_suppresses(self):
+        # rustfmt puts a long role list on its own lines — the suppression must survive that
+        wrapped = "restrict_to: [\n                admin,\n                OWNER,\n            ]"
+        src = self.RESTRICTED.replace("restrict_to: [admin, OWNER]", wrapped)
+        self.assertNotIn("public-mint-burn", {r for r, _ in fired(src)})
+
+    def test_method_absent_from_macro_still_fires(self):
+        # the macro exists but says nothing about this method — no evidence of a gate, so fire
+        src = self.RESTRICTED.replace("            mint_manager_badge => restrict_to: [admin, OWNER];\n", "")
+        self.assertIn("public-mint-burn", {r for r, _ in fired(src)})
+
+    def test_roles_block_entries_are_not_read_as_methods(self):
+        # `roles { ... }` uses the same `name => ...;` shape as `methods { ... }`, so parsing the
+        # whole macro would register every role as a method. Asserted on the parser directly:
+        # the behavioural symptom needs a role and a method to collide by name, which valid
+        # Scrypto makes hard to construct, but the map itself must stay clean either way.
+        st = sa.strip_comments_and_strings(self.RESTRICTED)
+        (_start, _end, decls), = sa._method_auth_index(st)
+        self.assertEqual(sorted(decls), ["get_badge_info", "mint_manager_badge"])
+        self.assertEqual(decls["mint_manager_badge"], "restricted")
+
+    def test_auth_is_scoped_per_blueprint(self):
+        # one blueprint's restrict_to must not speak for a sibling blueprint in the same .rs
+        src = """#[blueprint]
+mod a {
+    enable_method_auth! { methods { mint_it => restrict_to: [admin]; } }
+    struct A {}
+    impl A { pub fn mint_it(&mut self) {} }
+}
+#[blueprint]
+mod b {
+    enable_method_auth! { methods { mint_it => PUBLIC; } }
+    struct B {}
+    impl B { pub fn mint_it(&mut self) {} }
+}
+"""
+        self.assertEqual(sorted(ln for r, ln in fired(src) if r == "public-mint-burn"), [11])
+
+    def test_commented_out_restriction_does_not_suppress(self):
+        # an auth claim written in a comment is not auth — the stripper blanks it, so the rule
+        # must not accept it as a gate.
+        src = self.RESTRICTED.replace("            mint_manager_badge => restrict_to: [admin, OWNER];",
+                                      "            // mint_manager_badge => restrict_to: [admin, OWNER];")
+        self.assertIn("public-mint-burn", {r for r, _ in fired(src)})
+
+    def test_no_auth_macro_at_all_still_fires(self):
+        self.assertIn("public-mint-burn", {r for r, _ in fired("pub fn mint_free(&mut self) {}")})
+
+
+class TestOwnerRoleFixed(unittest.TestCase):
+    """owner-role-fixed: prepare_to_globalize(OwnerRole::Fixed(...)) — an owner that can never rotate.
+
+    Sibling of owner-role-none, which only matched OwnerRole::None and so reported a component
+    with an unrotatable owner (scrypto-xrd wallet-manager, live on mainnet) as clean.
+    """
+
+    def test_fires(self):
+        src = "let c = x.prepare_to_globalize(OwnerRole::Fixed(rule!(require(badge))));"
+        self.assertIn(("owner-role-fixed", 1), fired(src))
+
+    def test_severity_is_low(self):
+        # low, not medium: an owner exists, so nothing is immediately exploitable — what is lost
+        # is recoverability, and pinning the rule is a legitimate deliberate choice.
+        findings = sa.analyze_text("t.rs", "x.prepare_to_globalize(OwnerRole::Fixed(r));")
+        self.assertEqual([f["severity"] for f in findings if f["rule"] == "owner-role-fixed"], ["low"])
+
+    def test_rustfmt_wrapped_caught(self):
+        src = "let c = x.prepare_to_globalize(\n    OwnerRole::Fixed(rule!(require(badge))),\n);"
+        self.assertIn("owner-role-fixed", {r for r, _ in fired(src)})
+
+    def test_updatable_owner_is_clean(self):
+        self.assertEqual(fired("x.prepare_to_globalize(OwnerRole::Updatable(rule!(require(b))));"), set())
+
+    def test_owner_role_none_still_its_own_rule(self):
+        rules = {r for r, _ in fired("x.prepare_to_globalize(OwnerRole::None);")}
+        self.assertIn("owner-role-none", rules)
+        self.assertNotIn("owner-role-fixed", rules)
+
+    def test_resource_level_fixed_owner_is_not_flagged(self):
+        # the rule is anchored to component globalization. A resource built with a fixed owner
+        # is a different (and much narrower) decision — flagging it would be noise.
+        src = 'let r = ResourceBuilder::new_fungible(OwnerRole::Fixed(rule!(require(b))));'
+        self.assertEqual(fired(src), set())
+
+    def test_suppressible(self):
+        src = "x.prepare_to_globalize(OwnerRole::Fixed(r)); // sak:allow owner-role-fixed"
+        self.assertEqual(fired(src), set())
+
+
+class TestHandRolledAddressCheck(unittest.TestCase):
+    """hand-rolled-address-check: an address accepted on its prefix, with no bech32m decode.
+
+    scrypto-xrd wallet-manager validates a caller-supplied account address with a prefix test
+    plus `len() >= 40` plus `is_ascii_alphanumeric`, then persists it into NFT data that
+    off-chain systems read back. No checksum is verified, and that charset admits b/i/o/1,
+    which bech32 excludes.
+    """
+
+    REAL = ('fn is_valid_account_address(addr: &str) -> bool {\n'
+            '    (addr.starts_with("account_rdx1") || addr.starts_with("account_tdx_2_1"))\n'
+            '        && addr.len() >= 40\n'
+            '        && addr.chars().all(|c| c.is_ascii_alphanumeric() || c == \'_\')\n'
+            '}')
+
+    def test_fires_on_the_real_shape(self):
+        self.assertIn(("hand-rolled-address-check", 2), fired(self.REAL))
+
+    def test_one_finding_per_line(self):
+        # two HRP prefixes chained on one line is one hand-rolled validator, not two findings.
+        # Counts raw findings, not the deduplicated (rule, line) set `fired` returns — the set
+        # would hide exactly the duplication this asserts against.
+        hits = [f for f in sa.analyze_text("t.rs", self.REAL) if f["rule"] == "hand-rolled-address-check"]
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0]["line"], 2)
+
+    def test_resource_prefix_also_caught(self):
+        self.assertIn("hand-rolled-address-check",
+                      {r for r, _ in fired('if s.starts_with("resource_rdx1") { ok() }')})
+
+    def test_unrelated_starts_with_is_clean(self):
+        self.assertEqual(fired('if name.starts_with("guild_") { ok() }'), set())
+        self.assertEqual(fired('if s.starts_with(prefix) { ok() }'), set())
+
+    def test_entity_word_without_hrp_is_clean(self):
+        # the rule used to stop at the entity word (`account|resource|component|pool|internal|…`),
+        # so ordinary metadata/config keys that merely start with one fired. The network part
+        # (`_rdx1` / `_sim1` / `_tdx_<n>_1`) is what makes a literal an address, not a word.
+        for key in ("pool_unit_name", "internal_state_v2", "component_address",
+                    "resource_limit", "account_label"):
+            self.assertEqual(fired(f'if k.starts_with("{key}") {{ }}'), set(), key)
+
+    def test_testnet_and_simulator_hrps_caught(self):
+        # the mainnet HRP is `_rdx1`, but a validator written against stokenet (`_tdx_2_1`) or
+        # the simulator (`_sim1`) alone is the same hand-rolled check and must still fire.
+        self.assertIn("hand-rolled-address-check",
+                      {r for r, _ in fired('if a.starts_with("account_tdx_2_1") { ok() }')})
+        self.assertIn("hand-rolled-address-check",
+                      {r for r, _ in fired('if a.starts_with("account_sim1") { ok() }')})
+
+    def test_comment_does_not_fire(self):
+        self.assertEqual(fired('// addr.starts_with("account_rdx1") is not enough'), set())
+
+    def test_wrapped_call_caught(self):
+        self.assertIn("hand-rolled-address-check",
+                      {r for r, _ in fired('addr.starts_with(\n    "account_rdx1",\n)')})
+
+    def test_bare_prefix_is_only_this_rule(self):
+        # hardcoded-address needs 20+ bech32 data chars after the HRP, so the shape this rule is
+        # actually about — a bare `account_rdx1` prefix — reports once, not twice.
+        rules = [r for r, _ in fired('if a.starts_with("account_rdx1") { ok() }')]
+        self.assertEqual(rules, ["hand-rolled-address-check"])
+
+    def test_full_address_reports_both_rules(self):
+        # the two address rules are NOT disjoint: `starts_with("<a full address>")` is both a
+        # hardcoded address literal and a prefix-only validation, and both fire on that line.
+        # That is two distinct problems on one line, so two findings is the intended output —
+        # recorded here because the earlier "no overlap" framing was wrong.
+        rules = sorted(r for r, _ in fired(
+            'if a.starts_with("account_rdx1qcdefghjkmnpqrstuvwxyz23456789") { ok() }'))
+        self.assertEqual(rules, ["hand-rolled-address-check", "hardcoded-address"])
+
+    def test_suppressible(self):
+        src = 'if a.starts_with("account_rdx1") { ok() } // sak:allow hand-rolled-address-check'
+        self.assertEqual(fired(src), set())
 
 
 if __name__ == "__main__":
