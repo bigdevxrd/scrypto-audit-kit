@@ -17,9 +17,9 @@ agents as the `static_scan` MCP tool. Findings use `S-###` ids and `source: "sta
 Rules run over the source **after** a comment/string-aware stripper blanks the *contents* of
 comments and string/char literals (it handles nested block comments and string line-continuations,
 preserving line numbers). So **code** rules don't match inside a `// comment` or a `"string
-literal"`. Two rules intentionally read the other view — `hardcoded-address` checks string literals,
-`todo-comment` checks comments. Rules are deliberately **high-precision** (they prefer to miss over
-to over-flag); recall is the LLM pass's job.
+literal"`. Three rules intentionally read the other view — `hardcoded-address` and
+`hand-rolled-address-check` check string literals, `todo-comment` checks comments. Rules are
+deliberately **high-precision** (they prefer to miss over to over-flag); recall is the LLM pass's job.
 
 ## Rules
 
@@ -28,13 +28,15 @@ to over-flag); recall is the LLM pass's job.
 | `float-usage` | high | Integer / decimal arithmetic | `f32`/`f64` types in on-ledger math |
 | `missing-method-auth` | high | Auth bypass | a `#[blueprint]` with `pub fn`s but no `enable_method_auth!` |
 | `hardcoded-address` | medium | External calls / composability | bech32 address literals (`resource_rdx1…`) in source |
+| `hand-rolled-address-check` | medium | External calls / composability | `.starts_with("account_rdx1")` — an address accepted on its prefix, with no bech32m decode |
 | `unbounded-take-all` | medium | Resource handling | `.take_all()` — a whole-vault drain |
 | `owner-role-none` | medium | Upgrade safety | `prepare_to_globalize(OwnerRole::None)` — no owner |
+| `owner-role-fixed` | low | Upgrade safety | `prepare_to_globalize(OwnerRole::Fixed(…))` — an owner rule that can never be re-pointed |
 | `self-updatable-role` | medium | Upgrade safety | a role `updatable_by` itself |
 | `unsafe-block` | medium | Memory safety | `unsafe { … }` |
 | `panic-macro` | low | Error handling | `panic!`/`todo!`/`unimplemented!`/`unreachable!` |
 | `raw-decimal-arith` | medium | Integer / decimal arithmetic | raw `*`/`/` on a `.amount()` / `dec!()` Decimal — overflow / div-by-zero |
-| `public-mint-burn` | medium | Auth bypass | a `pub fn` named mint/burn — confirm it's role-gated |
+| `public-mint-burn` | medium | Auth bypass | a `pub fn` named mint/burn that its blueprint's `enable_method_auth!` does not restrict |
 | `unwrap-expect` | info | Error handling | `.unwrap()` / `.expect()` — a panic surface |
 | `todo-comment` | info | Maintainability | `TODO`/`FIXME`/`XXX`/`HACK` markers |
 
@@ -44,20 +46,23 @@ that a regex can't judge reliably.
 
 ## Suppressing a finding
 
-Put a `// sak:allow <rule-id>` comment on the offending line or the line directly above it:
+Put a `// sak:allow <rule-id>` comment on the offending line, or on a line of its own directly
+above it (a comment trailing code suppresses that line only — it does not carry to the next):
 
 ```rust
 self.vault.take_all() // sak:allow unbounded-take-all  (redeem path: caller already gated)
 ```
 
-Use `// sak:allow all` to suppress every rule on that line. Suppressions are visible in the
-diff, so a reviewer can see exactly what was waived and why.
+Every suppression must name one rule. There is no blanket form: `// sak:allow all` is **rejected**,
+because suppressions live in source written by the party under audit and "hide everything" would be
+a hole. Suppressions are visible in the diff, so a reviewer can see exactly what was waived and why.
 
 ## Adding a rule
 
 Rules live in [`bin/static_analysis.py`](../bin/static_analysis.py) as small functions
 registered with `@rule`. A rule reads the per-file context (`stripped_lines` for code,
-`raw_lines` when it needs comments) and yields findings via the `_f(...)` helper:
+`comments_lines` when it needs comments, `code_with_strings_lines` when it needs string
+literals) and yields findings via the `_f(...)` helper:
 
 ```python
 @rule

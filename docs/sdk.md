@@ -51,7 +51,7 @@ for f in findings:
     print(f["id"], f["severity"], f["location"], "—", f["title"])
 ```
 
-`analyze_package(pkg_dir)` walks `<pkg>/src/**.rs`, runs the [12 rules](static-analysis.md)
+`analyze_package(pkg_dir)` walks `<pkg>/src/**.rs`, runs the [14 rules](static-analysis.md)
 over a comment/string-aware view, and returns findings with `S-###` ids and `source:"static"`.
 Lower-level: `analyze_text(rel_path, src)` (one file) and
 `strip_comments_and_strings(src, keep_strings=False, keep_comments=False)`.

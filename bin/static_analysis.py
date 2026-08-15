@@ -8,8 +8,10 @@ with the LLM pass into one report.
 
 Design for precision: the source is first run through a comment/string-aware stripper that
 blanks the *contents* of comments and string/char literals while preserving every newline,
-so code rules don't match inside a comment or a string (hardcoded-address reads string literals and
-todo-comment reads comments, by design). Suppress a single finding with a
+so code rules don't match inside a comment or a string (hardcoded-address and
+hand-rolled-address-check read string literals, todo-comment reads comments, by design). Rules that
+must reason about auth read the enable_method_auth! block via _method_auth_index rather than
+guessing from the fn signature. Suppress a single finding with a
 `// sak:allow <rule-id>` comment on the offending line or the line above.
 
 Stdlib only. Importable (analyze_package) and a CLI. Unit-tested in tests/test_static_analysis.py.
@@ -184,6 +186,49 @@ def r_hardcoded_address(ctx):
 
 
 @rule
+def r_hand_rolled_address_check(ctx):
+    # the HRP lives in a string literal → strings kept, comments blanked. Whole-text so a
+    # rustfmt-wrapped `.starts_with(\n    "account_rdx1",\n)` can't evade a line scan.
+    #
+    # Deliberately narrow: only a `starts_with` against a Radix HRP. In Scrypto an address is a
+    # typed ComponentAddress / ResourceAddress that the engine has already decoded; testing a
+    # &str prefix instead means the address arrived as an unvalidated String and is being
+    # accepted on shape alone.
+    #
+    # The network part is REQUIRED, exactly as in the sibling r_hardcoded_address: an entity
+    # word alone (`starts_with("pool_")`, `starts_with("component_address")`,
+    # `starts_with("internal_state_v2")`) is an ordinary metadata/config-key prefix and was
+    # over-flagged when the pattern stopped at the entity list. Demanding `_rdx1` / `_sim1` /
+    # `_tdx_<n>_1` — the HRP plus bech32's `1` separator — is what makes the literal an address
+    # rather than a word. The entity half is left generic ([a-z_]{3,}) like the sibling rule, so
+    # locker/identity/internal_* and any future entity type are covered without a hand-kept list.
+    # The `(?:r#*)?` allows a raw string: r_hardcoded_address already matches inside one (the
+    # stripper preserves raw-string contents under keep_strings), so anchoring on a bare `"` here
+    # made `starts_with(r#"account_rdx1"#)` evade this rule alone.
+    #
+    # One finding per line, not per match: the real shape is a chain of prefix tests for the
+    # mainnet and testnet HRPs (`starts_with("account_rdx1") || starts_with("account_tdx_2_1")`),
+    # which is one hand-rolled validator, not two findings.
+    pat = re.compile(r"\.starts_with\s*\(\s*&?(?:r#*)?\""
+                     r"[a-z_]{3,}_(?:rdx1|sim1|tdx_[0-9a-z]+_1)")
+    seen = set()
+    for lineno, line, _m in _finditer_lines(ctx["code_with_strings"], pat):
+        if lineno in seen:
+            continue
+        seen.add(lineno)
+        yield _f(lineno, "hand-rolled-address-check", "medium", "External calls / composability",
+                 "address validated by string prefix, not by bech32m decode",
+                 f"`{line.strip()[:80]}` accepts an address on its prefix.",
+                 "A prefix (or length, or charset) test is not a bech32m decode: it accepts any "
+                 "attacker-chosen string of the right shape, checksum unverified — and an "
+                 "is_ascii_alphanumeric charset admits b/i/o/1, which bech32 excludes. Garbage that "
+                 "passes is then persisted on-ledger and trusted by every off-chain consumer downstream.",
+                 "Take the address as a typed ComponentAddress / ResourceAddress so the engine "
+                 "decodes and checksums it; if it must stay a String, reject anything that does not "
+                 "round-trip through a bech32m decode.")
+
+
+@rule
 def r_unbounded_take_all(ctx):
     # whole-text so `take_all\n(` (a valid-Rust newline split) can't evade a line scan; also catch
     # the semantically identical full drain written as take(<vault>.amount()).
@@ -205,6 +250,30 @@ def r_owner_role_none(ctx):
                  "`prepare_to_globalize(OwnerRole::None)` globalizes with no owner.",
                  "With no owner there is no authority to rotate roles, pause, or recover if a managing badge is lost or compromised.",
                  "Globalize with an explicit OwnerRole governing the admin role(s).")
+
+
+@rule
+def r_owner_role_fixed(ctx):
+    # Sibling of r_owner_role_none; whole-text for the same rustfmt-wrapping reason.
+    #
+    # `low`, not medium: unlike OwnerRole::None there IS an authority here, so nothing is
+    # immediately exploitable — what's lost is recoverability, and pinning the rule can be a
+    # legitimate deliberate choice for a component whose administration is meant to be immutable.
+    # It sits with panic-macro at low: a real property of the deployment that a reviewer must
+    # consciously sign off, not a likely bug. The waiver below is for designs where an unrotatable
+    # owner rule is the point — not for ones where it is a side effect. The kit's own attestation
+    # registry trips this rule and does NOT waive it; attestation/README.md says why.
+    for m in re.finditer(r"prepare_to_globalize\s*\(\s*OwnerRole::Fixed", ctx["stripped"]):
+        yield _f(_line_of(ctx["stripped"], m.start()), "owner-role-fixed", "low", "Upgrade safety",
+                 "owner rule is fixed and can never be rotated",
+                 "`prepare_to_globalize(OwnerRole::Fixed(...))` pins the owner rule for the life of "
+                 "the component.",
+                 "Fixed makes the rule itself immutable: if the owner badge is lost, burned or "
+                 "compromised there is no path to re-point the owner role, so administration is "
+                 "permanently stuck in whatever state that badge is in — including in an attacker's hands.",
+                 "Use OwnerRole::Updatable so the rule can be re-pointed (to a recovery rule or a "
+                 "multi-sig), unless immutable administration is a deliberate and documented property "
+                 "of the design — in which case waive this with `// sak:allow owner-role-fixed`.")
 
 
 @rule
@@ -281,6 +350,51 @@ def _brace_span_end(text, open_idx):
     return len(text)
 
 
+_ENABLE_METHOD_AUTH_RE = re.compile(r"\benable_method_auth!\s*\{")
+_METHODS_OPEN_RE = re.compile(r"\bmethods\s*\{")
+_AUTH_ENTRY_RE = re.compile(r"(\w+)\s*=>\s*([^;{}]*);")
+
+
+def _method_auth_index(text):
+    """Per-blueprint map of what `enable_method_auth!` declares for each method.
+
+    Returns [(body_start, body_end, {method: "public" | "restricted"}), …] — one tuple per
+    `#[blueprint] mod X { … }`, so a rule that matched a method can ask what the SURROUNDING
+    blueprint declares about it. Scoped per blueprint for the same reason r_missing_method_auth
+    is: one blueprint's `=> PUBLIC` must not speak for a sibling blueprint in the same .rs.
+
+    Only the `methods { … }` sub-block is read. The sibling `roles { … }` block uses the very
+    same `name => …;` shape (`admin => updatable_by: [OWNER];`), so parsing the whole macro would
+    register roles as methods. Run this on the stripped view — an auth claim written inside a
+    comment or a string literal is not auth, and it is already blanked there.
+    """
+    index = []
+    for bp_match in _BLUEPRINT_RE.finditer(text):
+        mod_match = _MOD_OPEN_RE.search(text, bp_match.end())
+        if not mod_match:
+            continue
+        body_start = mod_match.start()
+        body_end = _brace_span_end(text, mod_match.end() - 1)
+        decls = {}
+        auth = _ENABLE_METHOD_AUTH_RE.search(text, body_start, body_end)
+        if auth:
+            methods = _METHODS_OPEN_RE.search(text, auth.end(), _brace_span_end(text, auth.end() - 1))
+            if methods:
+                block = text[methods.end():_brace_span_end(text, methods.end() - 1) - 1]
+                for entry in _AUTH_ENTRY_RE.finditer(block):
+                    decls[entry.group(1)] = "restricted" if "restrict_to" in entry.group(2) else "public"
+        index.append((body_start, body_end, decls))
+    return index
+
+
+def _declared_auth(index, offset, method):
+    """What the blueprint containing `offset` declares for `method`, or None if it says nothing."""
+    for start, end, decls in index:
+        if start <= offset < end:
+            return decls.get(method)
+    return None
+
+
 @rule
 def r_missing_method_auth(ctx):
     # Per-blueprint, not per-file (BUG-HUNT-2026-07-18 H2): the old check took only the FIRST
@@ -336,11 +450,25 @@ def r_unwrap_expect(ctx):
 @rule
 def r_public_mint_burn(ctx):
     # whole-text so `pub\nfn mint_free(` can't evade the line scan.
-    pat = re.compile(r"\bpub\s+fn\s+\w*(mint|burn)\w*\s*\(")
+    #
+    # Cross-references enable_method_auth! and stays silent when the method is declared
+    # `restrict_to: [...]` — the gate lives in the macro, not on the fn, and `pub fn` is how
+    # EVERY Scrypto method is written whether gated or not. Without this the rule flagged a live
+    # mainnet component's `mint_manager_badge` as an unrestricted mint while the same file's auth
+    # block declared `mint_manager_badge => restrict_to: [admin, OWNER];`. A method declared
+    # `=> PUBLIC`, or absent from the macro entirely, still fires.
+    pat = re.compile(r"\bpub\s+fn\s+(\w*(mint|burn)\w*)\s*\(")
+    index = _method_auth_index(ctx["stripped"])
     for lineno, line, m in _finditer_lines(ctx["stripped"], pat):
+        verb = m.group(2)
+        declared = _declared_auth(index, m.start(), m.group(1))
+        if declared == "restricted":
+            continue
+        gate = ("declared `=> PUBLIC`" if declared == "public"
+                else "absent from the blueprint's enable_method_auth! rules")
         yield _f(lineno, "public-mint-burn", "medium", "Auth bypass",
-                 f"{m.group(1)} method — confirm it is role-gated",
-                 f"`{line.strip()[:80]}` is a public fn that {m.group(1)}s.",
+                 f"{verb} method — confirm it is role-gated",
+                 f"`{line.strip()[:80]}` is a public fn that {verb}s, {gate}.",
                  "An unrestricted mint/burn is unbounded supply control.",
                  "Restrict it via enable_method_auth! to a least-privileged role; don't leave it PUBLIC.")
 
@@ -378,6 +506,7 @@ def _suppressed(comment_lines, code_lines, line, rule_id):
 def analyze_text(rel_path, src):
     """Run all rules over one file's source. Returns raw findings (no ids yet)."""
     stripped = strip_comments_and_strings(src)
+    code_with_strings = strip_comments_and_strings(src, keep_strings=True)
     ctx = {
         "rel_path": rel_path,
         "raw": src,
@@ -385,7 +514,8 @@ def analyze_text(rel_path, src):
         "stripped": stripped,
         "stripped_lines": stripped.splitlines(),
         "comments_lines": strip_comments_and_strings(src, keep_comments=True).splitlines(),
-        "code_with_strings_lines": strip_comments_and_strings(src, keep_strings=True).splitlines(),
+        "code_with_strings": code_with_strings,
+        "code_with_strings_lines": code_with_strings.splitlines(),
     }
     found = []
     for fn in RULES:

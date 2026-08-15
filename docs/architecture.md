@@ -34,7 +34,7 @@ model / checklist version + a sha256 of the analyzed source).
           ▼                               ▼
    static pass                      LLM checklist pass
    static_analysis.py               audit.sh → backend (claude-api / aider / cmd)
-   12 rules · free ·                prompts/ + references/
+   14 rules · free ·                prompts/ + references/
    reproducible                     semantic · advisory · needs a backend
           │  S-### findings                │  F-### findings
           └───────────────┬───────────────┘
