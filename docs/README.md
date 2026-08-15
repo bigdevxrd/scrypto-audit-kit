@@ -33,6 +33,7 @@ Start with what you want to do.
 | Understand the strategy, status, and history | [../VISION.md](../VISION.md) · [../ROADMAP.md](../ROADMAP.md) · [../CHANGELOG.md](../CHANGELOG.md) |
 | Know exactly what it does and doesn't catch | [README — Limitations](../README.md#limitations--read-this-before-relying-on-the-output) |
 | Contribute | [../CONTRIBUTING.md](../CONTRIBUTING.md) · [../AGENTS.md](../AGENTS.md) (agents) |
+| Report a vulnerability **in the kit** (not a finding it raised) | [../SECURITY.md](../SECURITY.md) |
 
 ## The one thing to remember
 

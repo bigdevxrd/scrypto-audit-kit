@@ -36,8 +36,11 @@ dist/
 .eggs/
 .pytest_cache/
 
-# Claude agent worktrees (local only)
+# Claude agent local state (machine-local, never shared). settings.local.json can carry
+# permission overrides for this machine — committing it would hand them to everyone.
+# The tracked skill under .claude/skills/ is deliberately not matched here.
 .claude/worktrees/
+.claude/settings.local.json
 
 # Retired docs kept on this machine only
 .local-archive/

@@ -14,7 +14,7 @@ Unacceptable behaviour includes harassment, personal attacks, public or private 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behaviour may be reported by opening a GitHub issue with the `coc-violation` label, or by contacting the maintainers directly (see the repo's maintainers list). All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behaviour may be reported by opening a GitHub issue with the `coc-violation` label, or — if the report should not be public — by contacting the maintainer, [@bigdevxrd](https://github.com/bigdevxrd), directly on GitHub. This project is solo-maintained, so a private report is read by one person; if that person is the subject of your report, escalate to [GitHub's own abuse reporting](https://github.com/contact/report-abuse) instead. All complaints will be reviewed and investigated promptly and fairly.
 
 Maintainers are obligated to respect the privacy and security of the reporter of any incident.
 
