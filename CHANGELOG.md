@@ -4,12 +4,19 @@ Notable changes to scrypto-audit-kit. The kit version lives in [VERSION](VERSION
 stamped into every report; this log follows [Keep a Changelog](https://keepachangelog.com) and
 [SemVer](https://semver.org). The kit was built in a compressed timeline — dates reflect that.
 
-## [0.7.1] — 2026-08-15 — the rest of the CI hole, and a distribution that works
+## [0.8.0] — 2026-08-15 — honest claims, and the rest of the CI hole
 
 v0.7.0 closed argument injection in the reusable workflow. A post-release adversarial sweep found
 the **same bug class still open one step later in the same file**, plus an analyzer that failed
-open and a distribution that could not test itself. **`v0.7.1` supersedes `v0.7.0` as the floor
-for CI callers.**
+open, a distribution that could not test itself, and an attestation that claimed a trust level it
+could not justify. **`v0.8.0` supersedes `v0.7.0` as the floor for CI callers.**
+
+**A minor, not a patch.** This log claims SemVer, and the release breaks published surfaces:
+`attest.build_payload()` returns `mode` + `static_ruleset_version` instead of `level`, the
+`--level` flag and the `attestation_payload` MCP tool's `level` parameter are gone, and
+`import scrypto_audit_kit` no longer mutates `sys.path`. For a kit whose whole pitch is never
+overclaiming, the version number is part of the claim — shipping this as `0.7.1` would have been
+the same category of error as the attestation level it fixes.
 
 ### Fixed
 
@@ -97,6 +104,45 @@ for CI callers.**
   `pip install mcp[cli]`"*, which is exactly what the user had just run. Bounded to `<2`; lifting
   it requires porting the server to the 2.x entry point first.
 
+### Security & supply chain
+
+- **CI runs can now earn rung L2** ([.github/workflows/pre-audit.yml](.github/workflows/pre-audit.yml),
+  [docs/ci.md](docs/ci.md)). New opt-in `sign-provenance` input has GitHub sign the report's
+  provenance over OIDC, binding it to the workflow, repo and commit — so a reader verifies against
+  GitHub's identity instead of the author's word (`gh attestation verify`). Until now L2 was
+  *documented but unreachable*: everything the workflow did proved a report existed, never who
+  produced it. Off by default (it writes an attestation against the caller's repo) and it runs
+  only when the gate passed, since a signed statement for a report that failed its own threshold
+  would attest to a run the caller already rejected.
+- **Every third-party action is SHA-pinned**, with [Dependabot](.github/dependabot.yml) added in
+  the same change to move the pins. A tag is mutable: `@v4` is whatever that tag points at today,
+  inside a job holding an API key. Pinning without automated updates is how a pin that was a
+  security control becomes the thing keeping a known-vulnerable version — the two halves only work
+  together.
+- **`deepseek` / `both` are rejected up front** rather than failing deep inside the audit. They
+  need a `DEEPSEEK_API_KEY` this workflow never forwards, so they could not authenticate; they
+  installed aider and then died with an auth error that read like a kit bug. Traced first: neither
+  the `env:` block nor `audit.sh`'s `.env` fallback can supply that key here, so no path existed
+  where they worked. The now-unreachable aider install step is gone.
+- **PEP 740 attestations are documented** ([RELEASING.md](RELEASING.md)). Trusted Publishing has
+  signed every upload since v0.5.0 — nobody was told, and an unverifiable signature helps nobody.
+  "Install from PyPI" is only supply-chain advice if the artifact's origin can be checked.
+
+### Packaging
+
+- **CI tests the Python floor it advertises** ([.github/workflows/lint.yml](.github/workflows/lint.yml)).
+  The suite ran on 3.12 only, which is precisely how two 3.8-specific breakages shipped. Now a
+  matrix of 3.8 (on `ubuntu-22.04`, since 3.8 is EOL and absent from the 24.04 image) and 3.12.
+- **PEP 639 license metadata.** The `license = { text = ... }` table is deprecated with a hard
+  removal date of 2027-02-18 against a build backend floored at `>=64` — i.e. the build was going
+  to break on a day nobody chose. Now `license = "Apache-2.0"` + `license-files`, backend floor
+  raised to `>=77`.
+- **The PyPI project page's links work.** All 29 relative links in the README resolved against
+  pypi.org and 404'd; they are absolute now. Per-version Python classifiers added so the sidebar
+  shows the real support surface.
+- `audit_package`'s missing-harness error now names the `SAK_HOME` remedy, as `get_checklist`'s
+  already did — an agent reading "audit.sh not found" cannot know the fix is an env var.
+
 ### Removed
 
 Each of these was verified dead by re-deriving every reference across the tree and re-running the
@@ -129,7 +175,7 @@ a published tool contract; its docstrings now say so).
   died immediately, and after that 27 tests failed on absent fixtures. Downstream packagers
   (conda-forge, Debian, Nix, corporate mirrors) build from the sdist by convention, and for a
   security tool it is also how someone verifies from source that the artifact matches the repo.
-  The sdist now runs its full 221-test suite green.
+  The sdist now runs its full 224-test suite green.
 - **The `[mcp]` and `[dev]` extras are installable on the Python version we claim to support**
   ([pyproject.toml](pyproject.toml)) — **high**. Every published `mcp` release requires 3.10+,
   but `requires-python` is `>=3.8` and the wheel is `py3-none-any`, so pip served it to 3.8/3.9
@@ -158,7 +204,10 @@ a published tool contract; its docstrings now say so).
 - Attestation-honesty tests ([tests/test_attest.py](tests/test_attest.py)) — fail-low derivation
   on absent/junk tiers, refusal on a missing anchor, the absence of any `level` field, and a
   parity test running the real `audit.sh` hashing pipeline against `sak_lib.source_hash` on two
-  packages, so the shell and Python anchors can never drift. **221 tests total.**
+  packages, so the shell and Python anchors can never drift.
+- Coverage for `sak_lib.newest_report`, which was advertised in [docs/sdk.md](docs/sdk.md) with no
+  test and no in-tree caller. Kept rather than removed — it is public API on an already-published
+  package, so deleting it breaks a downstream importer silently for no gain. **224 tests total.**
 
 ## [0.7.0] — 2026-08-15 — CI hardening and rule precision
 

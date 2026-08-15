@@ -19,7 +19,7 @@
         "model": { "type": "string", "description": "analysis model, e.g. anthropic/claude-sonnet-4-6. A DISPLAY label — never parse it to decide what ran; read `tiers` instead." },
         "tiers": {
           "type": "array",
-          "description": "Which analysis tiers actually ran, as a fact. The only field an attestation mode may be derived from. Optional, for reports produced before 0.7.1: consumers MUST treat its absence as 'static' (the lower claim), never as 'hybrid'.",
+          "description": "Which analysis tiers actually ran, as a fact. The only field an attestation mode may be derived from. Optional, for reports produced before 0.8.0: consumers MUST treat its absence as 'static' (the lower claim), never as 'hybrid'.",
           "items": { "type": "string", "enum": ["static", "llm"] },
           "uniqueItems": true
         },

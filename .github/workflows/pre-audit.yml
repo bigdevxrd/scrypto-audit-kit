@@ -10,7 +10,7 @@ on:
         required: true
         type: string
       model:
-        description: "claude — the only value CI can authenticate. deepseek | both are aider cross-model modes that also need a DEEPSEEK_API_KEY, and this workflow forwards no such secret, so they fail here; they work locally (docs/backends.md)."
+        description: "claude — the only value CI can authenticate, and now the only accepted one. deepseek | both are aider cross-model modes needing a DEEPSEEK_API_KEY this workflow never forwards; they are rejected up front with an explanation rather than failing mid-audit. They work locally (docs/backends.md)."
         required: false
         default: claude
         type: string
@@ -19,8 +19,13 @@ on:
         required: false
         default: high
         type: string
+      sign-provenance:
+        description: "Sign the report's provenance with GitHub's OIDC identity (actions/attest-build-provenance). This is what earns rung L2: a reader can verify an independent runner produced the report, not the claimant. Off by default — it writes an attestation against YOUR repo and needs `attestations: write`, which a reusable workflow cannot grant itself. To enable, set this true AND add `permissions: { attestations: write, id-token: write, contents: read }` to your calling job."
+        required: false
+        default: false
+        type: boolean
       kit-ref:
-        description: "scrypto-audit-kit ref to pin (tag/branch/sha). Defaults to main — pin it to the same release as the `uses:` ref, or the audit code moves under you. Floor is v0.7.1, matching the `uses:` ref: v0.7.0 and earlier ship a static analyzer that exits 0 on a package path it never read (a green build for an unscanned package), v0.6.0 defaults to the claude-api backend and v0.5.0 has no [llm] extra at all, so on either the backend install step below fails the job rather than letting it die mid-audit."
+        description: "scrypto-audit-kit ref to pin (tag/branch/sha). Defaults to main — pin it to the same release as the `uses:` ref, or the audit code moves under you. Floor is v0.8.0, matching the `uses:` ref: v0.7.0 and earlier ship a static analyzer that exits 0 on a package path it never read (a green build for an unscanned package), v0.6.0 defaults to the claude-api backend and v0.5.0 has no [llm] extra at all, so on either the backend install step below fails the job rather than letting it die mid-audit."
         required: false
         default: main
         type: string
@@ -36,11 +41,39 @@ jobs:
     timeout-minutes: 30
     # Least privilege: a reusable workflow inherits the CALLER's token scope, so hard-cap it
     # here — the audit only reads code. (It can only downgrade the caller, never widen it.)
+    #
+    # id-token/attestations are needed ONLY by the optional provenance-signing step. Listing them
+    # here does not grant them: the caller's job must also grant them, or the token simply does
+    # not carry them and the signing step fails while everything above it still runs.
     permissions:
       contents: read
+      id-token: write
+      attestations: write
     steps:
+      - name: Validate inputs
+        # `deepseek` and `both` are aider cross-model modes needing a DEEPSEEK_API_KEY that this
+        # workflow does not accept and never forwards — they CANNOT authenticate here. They used
+        # to install aider and then fail deep inside the audit with an auth error that looks like
+        # a kit bug. Reject them here, where the message can say why. (Traced before removing the
+        # aider install: neither the env: block nor audit.sh's .env fallback can supply that key
+        # in this job, so there is no path where these modes work.)
+        env:
+          MODEL: ${{ inputs.model }}
+        run: |
+          case "$MODEL" in
+            claude) ;;
+            deepseek|both)
+              echo "::error::model '$MODEL' cannot run in CI: it is an aider cross-model mode that"
+              echo "needs a DEEPSEEK_API_KEY, and this workflow accepts no such secret. Use"
+              echo "model: claude in CI; the cross-model modes work locally (docs/backends.md)."
+              exit 1 ;;
+            *)
+              echo "::error::unknown model '$MODEL' — expected 'claude'."
+              exit 1 ;;
+          esac
+
       - name: Check out the project under audit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # Land the untrusted tree in a subdirectory, NOT at $GITHUB_WORKSPACE. The workspace
           # root is the default cwd of every `run:` step, and CPython puts the cwd on sys.path
@@ -56,7 +89,7 @@ jobs:
           persist-credentials: false
 
       - name: Check out scrypto-audit-kit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: bigdevxrd/scrypto-audit-kit
           # Caller-controlled, but this is an action input, not a run script: the runner hands
@@ -66,7 +99,7 @@ jobs:
           path: .scrypto-audit-kit
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
@@ -92,16 +125,9 @@ jobs:
           if ! python3 -P -c 'import anthropic' 2>/dev/null; then
             echo "::error::the claude-api backend needs the 'anthropic' package and it is not installed."
             echo "kit-ref '$KIT_REF' has no [llm] extra (added in v0.6.0), so pip only warned and skipped it."
-            echo "Pin kit-ref to v0.7.1 or later, or install anthropic yourself before this workflow runs."
+            echo "Pin kit-ref to v0.8.0 or later, or install anthropic yourself before this workflow runs."
             exit 1
           fi
-
-      - name: Install aider
-        # Only the cross-model modes need it: model: deepseek|both switch audit.sh to the
-        # aider backend, which wants aider on PATH. The default (claude) never calls aider,
-        # so don't pay for the install on every run.
-        if: inputs.model == 'deepseek' || inputs.model == 'both'
-        run: pipx install aider-chat
 
       - name: Run pre-audit
         # Bind the caller's inputs to env vars and quote the variables — never interpolate
@@ -118,7 +144,7 @@ jobs:
 
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pre-audit-report
           path: .scrypto-audit-kit/audit-reports/*
@@ -129,3 +155,20 @@ jobs:
         env:
           FAIL_ON: ${{ inputs.fail-on }}
         run: python3 .scrypto-audit-kit/bin/ci-gate.py --reports .scrypto-audit-kit/audit-reports --fail-on "$FAIL_ON"
+
+      - name: Sign the report's provenance
+        # THIS is what makes a run L2 rather than L1-with-an-audit-trail. Everything above proves
+        # only that a report exists; the rung is about WHO WITNESSED the run, and a claimant
+        # cannot witness themselves (docs/attestation-levels.md).
+        #
+        # attest-build-provenance has the build platform sign a statement binding this artifact
+        # to this workflow, repo, and commit, via OIDC — so a reader verifies it against GitHub's
+        # identity rather than against the author's word. `gh attestation verify` checks it.
+        #
+        # Runs on success only: a signed statement for a report that failed its own gate would be
+        # a signature attesting to a run the caller already rejected. Opt-out because it writes an
+        # attestation against the CALLER's repo, and not every caller wants that.
+        if: success() && inputs.sign-provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: .scrypto-audit-kit/audit-reports/*.json

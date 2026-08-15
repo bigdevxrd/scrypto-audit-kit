@@ -226,3 +226,30 @@ class TestSakLib(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNewestReport(unittest.TestCase):
+    """`newest_report` is advertised in docs/sdk.md but had no test and no in-tree caller.
+
+    It is kept rather than removed: it is public API on a package that is already published, so
+    deleting it breaks a downstream importer silently for no gain. Covered here instead, with the
+    reason it must not be used as a gate fallback — picking "the newest report lying around" would
+    let a stale clean report satisfy a gate for code that was never scanned.
+    """
+
+    def test_returns_the_most_recently_modified_json(self):
+        d = tempfile.mkdtemp()
+        old = os.path.join(d, "old.json")
+        new = os.path.join(d, "new.json")
+        for p in (old, new):
+            with open(p, "w", encoding="utf-8") as fh:
+                fh.write("{}")
+        os.utime(old, (1_000_000, 1_000_000))
+        os.utime(new, (2_000_000, 2_000_000))
+        self.assertEqual(sak_lib.newest_report(d), new)
+
+    def test_returns_none_on_an_empty_directory(self):
+        self.assertIsNone(sak_lib.newest_report(tempfile.mkdtemp()))
+
+    def test_returns_none_on_a_missing_directory(self):
+        self.assertIsNone(sak_lib.newest_report(os.path.join(tempfile.mkdtemp(), "nope")))

@@ -83,7 +83,7 @@ class TestAttest(unittest.TestCase):
         HIGHER claim on anything it did not recognise, so an unknown or user-supplied model
         string asserted that the LLM checklist pass had run."""
         d = attest._derive_mode
-        for report in ({"kit": {}},                                     # pre-0.7.1 report
+        for report in ({"kit": {}},                                     # pre-0.8.0 report
                        {"kit": {"tiers": []}},                          # nothing ran
                        {"kit": {"tiers": "llm"}},                       # wrong type
                        {"kit": {"tiers": None}},

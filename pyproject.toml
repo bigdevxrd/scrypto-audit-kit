@@ -13,7 +13,10 @@
 # and docs/backends.md.
 
 [build-system]
-requires = ["setuptools>=64"]
+# >=77 for PEP 639 (`license = "Apache-2.0"` + `license-files`). Floor, not a pin:
+# a build backend that is too OLD fails loudly, whereas an unbounded newer one is
+# how the deprecated license table was going to break the build unattended.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -22,15 +25,27 @@ dynamic = ["version"]
 description = "Pre-audit toolkit for Scrypto blueprints on Radix: deterministic static analysis, an LLM checklist pass, machine-readable reports, an MCP server, and on-chain attestation."
 readme = "README.md"
 requires-python = ">=3.8"
-license = { text = "Apache-2.0" }
+# PEP 639 SPDX form. The old `license = { text = ... }` table is deprecated with a hard removal
+# date (setuptools 2027-02-18) and the build backend is unpinned above `>=64`, so leaving it
+# meant the build breaks on a day nobody chose. The paired `License ::` classifier is removed
+# because PEP 639 forbids carrying both.
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "bigdev" }]
 keywords = ["scrypto", "radix", "smart-contracts", "security", "audit", "static-analysis", "mcp", "defi", "web3"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent",
+  # Per-version classifiers so PyPI's sidebar shows the real support surface rather than a bare
+  # "Python :: 3". These must track `requires-python`.
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Security",
   "Topic :: Software Development :: Quality Assurance",
 ]

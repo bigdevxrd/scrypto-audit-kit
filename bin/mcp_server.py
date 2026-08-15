@@ -63,7 +63,11 @@ _JSON_PATH_RE = re.compile(r"^\s*json:\s*(.+\.json)\s*$", re.MULTILINE)
 def _run_audit(package_path, model, no_compile_check):
     """Run audit.sh and return (report_path_or_None, combined_log)."""
     if not os.path.isfile(AUDIT_SH):
-        return None, f"audit.sh not found at {AUDIT_SH}"
+        # Name the remedy, as get_checklist's error does. Installed from pip, the harness is
+        # simply not in the wheel — an agent reading "not found" has no way to know the fix is
+        # an env var rather than a broken install.
+        return None, (f"audit.sh not found at {AUDIT_SH} — the LLM audit needs a kit clone. "
+                      "Run the server from one, or set SAK_HOME to point at one.")
     cmd = ["bash", AUDIT_SH, "--model", model]
     if no_compile_check:
         cmd.append("--no-compile-check")

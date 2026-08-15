@@ -17,9 +17,9 @@ jobs:
     name: shellcheck audit.sh
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Run shellcheck
-        uses: ludeeus/action-shellcheck@2.0.0
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
           scandir: '.'
           ignore_paths: 'audit-reports references'
@@ -28,8 +28,8 @@ jobs:
     name: markdownlint prompts + references
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
       - run: npm install -g markdownlint-cli@0.39.0
@@ -39,14 +39,28 @@ jobs:
         run: markdownlint README.md CHANGELOG.md RELEASING.md CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md AGENTS.md VISION.md ROADMAP.md docs/ prompts/ references/ examples/ attestation/
 
   tests:
-    name: unit tests
-    runs-on: ubuntu-latest
+    name: unit tests (py${{ matrix.python-version }})
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Test the DECLARED floor, not just the newest. Testing only 3.12 is how two 3.8-specific
+        # breakages shipped: the [mcp]/[dev] extras were uninstallable there (every mcp release
+        # needs 3.10+), and nothing exercised the floor `requires-python` advertises.
+        include:
+          - python-version: '3.8'
+            # 3.8 is EOL and absent from the 24.04 runner image; 22.04 still provides it.
+            runs-on: ubuntu-22.04
+          - python-version: '3.12'
+            runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
       - name: Install with dev extras (jsonschema + mcp enable contract validation + the MCP tests)
+        # On 3.8/3.9 the mcp marker resolves the extra to nothing — that is the point of this
+        # matrix entry: the install must SUCCEED there, with the MCP tests skipping cleanly.
         run: pip install ".[dev]"
       - name: Run unit tests
         run: python3 -m unittest discover -s tests -t .
