@@ -528,6 +528,13 @@ def analyze_text(rel_path, src):
 
 
 def _iter_rs_files(pkg_dir):
+    # os.walk() on a path that does not exist yields NOTHING and raises nothing, so without this
+    # guard a typo'd or renamed package path produced "0 findings", exit 0 — a clean bill of
+    # health for a directory we never opened. An analyzer that fails open is worse than no
+    # analyzer: the build goes green and the caller believes it was checked. Fail closed, the
+    # same way ci-gate.py does on a missing reports dir.
+    if not os.path.isdir(pkg_dir):
+        raise NotADirectoryError(f"package path is not a directory: {pkg_dir}")
     src_dir = os.path.join(pkg_dir, "src")
     base = src_dir if os.path.isdir(src_dir) else pkg_dir
     for root, _dirs, files in os.walk(base):
@@ -573,7 +580,23 @@ def main():
     ap = argparse.ArgumentParser(description="Deterministic Scrypto static analysis.")
     ap.add_argument("package", help="path to the Scrypto package (or a src dir)")
     ap.add_argument("--out", help="write the findings JSON array to this file")
+    ap.add_argument("--allow-empty", action="store_true",
+                    help="exit 0 when the package contains no .rs files (default: fail closed)")
     args = ap.parse_args()
+
+    # Fail closed on a package we could not read, mirroring ci-gate.py's --allow-missing: a
+    # scan that opened nothing must not report a clean bill of health. Both the missing-dir
+    # case (raised below) and the no-sources case are silent green builds otherwise.
+    try:
+        n_files = sum(1 for _ in _iter_rs_files(args.package))
+    except NotADirectoryError as exc:
+        sys.stderr.write(f"::error::{exc}\n")
+        return 2
+    if n_files == 0 and not args.allow_empty:
+        sys.stderr.write(
+            f"::error::no .rs files found under {args.package} — refusing to report a clean "
+            f"scan of a package that was never read. Check the path, or pass --allow-empty.\n")
+        return 2
 
     findings = analyze_package(args.package)
     counts = sak_lib.severity_counts(findings)

@@ -10,6 +10,12 @@ on:
   pull_request:
     paths: ['attestation/**']
 
+# Least privilege: without an explicit block the token scope is whatever the repo's
+# default happens to be — a web setting that can be widened without touching this file.
+# Neither job writes anything.
+permissions:
+  contents: read
+
 jobs:
   cargo-check:
     name: cargo check (attestation)

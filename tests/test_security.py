@@ -5,6 +5,7 @@ OPEN on missing/malformed reports, and severity-gate bypass via unknown/whitespa
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -183,6 +184,100 @@ class TestSeverityBypass(unittest.TestCase):
 
     def test_none_gate_never_fails_even_on_unknown(self):
         self.assertTrue(sak_lib.gate_verdict({"findings": [_finding("blocker")]}, "none")["passed"])
+
+
+STATIC = os.path.join(BIN, "static_analysis.py")
+
+
+def run_static(*args):
+    return subprocess.run([sys.executable, STATIC, *args],
+                          capture_output=True, text=True)
+
+
+class TestStaticAnalyzerFailsClosed(unittest.TestCase):
+    """The analyzer must never report a clean scan of a package it did not read.
+
+    os.walk() on a missing path yields nothing and raises nothing, so a typo'd or renamed
+    package path used to produce `{"count": 0}` and exit 0 — a green build for a directory
+    that was never opened. sak-gate already fails closed on a missing reports dir; the two
+    entry points shipped in the same wheel must not have opposite safety defaults.
+    """
+
+    def test_missing_package_path_exits_nonzero(self):
+        r = run_static(os.path.join(tempfile.mkdtemp(), "does-not-exist"))
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("not a directory", r.stderr)
+
+    def test_package_with_no_rs_files_exits_nonzero(self):
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "Cargo.toml"), "w", encoding="utf-8") as fh:
+            fh.write("[package]\n")
+        r = run_static(d)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("no .rs files", r.stderr)
+
+    def test_allow_empty_is_an_explicit_opt_out(self):
+        r = run_static(tempfile.mkdtemp(), "--allow-empty")
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(json.loads(r.stdout)["count"], 0)
+
+    def test_real_package_still_scans(self):
+        r = run_static(os.path.join(ROOT, "examples", "vulnerable-vault"))
+        self.assertEqual(r.returncode, 0)
+        self.assertGreater(json.loads(r.stdout)["count"], 0)
+
+    def test_analyze_package_raises_rather_than_returning_empty(self):
+        import static_analysis
+        with self.assertRaises(NotADirectoryError):
+            static_analysis.analyze_package(os.path.join(tempfile.mkdtemp(), "nope"))
+
+
+class TestWorkflowsDoNotImportFromUntrustedCwd(unittest.TestCase):
+    """`python3 -c 'import X'` puts the cwd on sys.path[0].
+
+    The reusable pre-audit workflow checks out the package under audit and runs steps in the
+    same tree, one of them holding ANTHROPIC_API_KEY. A hostile package shipping its own
+    anthropic.py therefore both executed AND satisfied the probe. Two independent guards now
+    stop that: the untrusted checkout lands under target/ (so the workspace root is ours), and
+    the probe runs with -P. This test pins both, because either alone is enough to close the
+    hole and a future edit could plausibly remove one without noticing the other mattered.
+    """
+
+    WF = os.path.join(ROOT, ".github", "workflows", "pre-audit.yml")
+
+    def setUp(self):
+        # MANIFEST.in ships .github/workflows in the sdist precisely so this coverage survives
+        # there. Skip rather than error if a downstream repackager strips it anyway.
+        if not os.path.isfile(self.WF):
+            self.skipTest("workflow file not present in this distribution")
+        with open(self.WF, encoding="utf-8") as fh:
+            self.src = fh.read()
+
+    def test_untrusted_checkout_is_not_at_workspace_root(self):
+        self.assertIn("path: target", self.src)
+
+    def test_every_dash_c_invocation_disables_the_cwd_path(self):
+        # Executable lines only — the surrounding comments deliberately spell out the unsafe
+        # form to explain the hazard, and matching those would make the test unwritable.
+        code = "\n".join(ln for ln in self.src.splitlines() if not ln.lstrip().startswith("#"))
+        bare = re.findall(r"python3?\s+(?!-P)(?:-\w+\s+)*-c\b", code)
+        self.assertEqual(bare, [], f"`python3 -c` without -P in {self.WF}: {bare}")
+
+    def test_the_documented_attack_actually_works_without_the_guard(self):
+        # Guard against a future "-P is cargo-culting, drop it" cleanup: prove the vector is real.
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "anthropic.py"), "w", encoding="utf-8") as fh:
+            fh.write("import sys; sys.stderr.write('PAYLOAD RAN\\n')\n")
+        unguarded = subprocess.run([sys.executable, "-c", "import anthropic"],
+                                   cwd=d, capture_output=True, text=True)
+        self.assertEqual(unguarded.returncode, 0)
+        self.assertIn("PAYLOAD RAN", unguarded.stderr)
+        if sys.version_info < (3, 11):
+            self.skipTest("-P needs python 3.11+; the workflow pins 3.12")
+        guarded = subprocess.run([sys.executable, "-P", "-c", "import anthropic"],
+                                 cwd=d, capture_output=True, text=True)
+        self.assertNotEqual(guarded.returncode, 0)
+        self.assertNotIn("PAYLOAD RAN", guarded.stderr)
 
 
 if __name__ == "__main__":

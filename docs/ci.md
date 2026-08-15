@@ -12,11 +12,11 @@ Copy [`examples/ci/pre-audit.yml`](../examples/ci/pre-audit.yml) into your repo 
 ```yaml
 jobs:
   scrypto-pre-audit:
-    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.7.0
+    uses: bigdevxrd/scrypto-audit-kit/.github/workflows/pre-audit.yml@v0.7.1
     with:
       package: packages/my-blueprint
       fail-on: high
-      kit-ref: v0.7.0
+      kit-ref: v0.7.1
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
@@ -26,15 +26,22 @@ selects the audit code the workflow checks out, and `kit-ref` defaults to `main`
 leave it off. `@main` runs whatever is on the kit's HEAD at that moment, in your CI, with
 your `ANTHROPIC_API_KEY` in reach.
 
-**Use v0.7.0 or later — this is a floor, not just "the newest tag".** The `v0.5.0` and `v0.6.0`
-tags ship a `pre-audit.yml` that interpolates caller inputs directly into `run:` scripts, so a
-crafted `model` or `fail-on` value executes in the job that holds your `ANTHROPIC_API_KEY`.
-`v0.6.0` additionally defaults to the `claude-api` backend while its workflow installs only
-aider, so the default run dies mid-audit on a missing `anthropic`. (`v0.5.0` predates that
-backend entirely — its default run works; only the injection affects it.) Both are fixed in
-v0.7.0. If v0.7.0 is not tagged
-yet, pin a commit SHA from the kit's `main` instead of dropping back to an older tag — a SHA is
-just as reproducible and does not carry the injectable workflow.
+**Use v0.7.1 or later — this is a floor, not just "the newest tag".** Every earlier tag lets code
+from the package you are auditing run inside your CI job:
+
+- **`v0.7.0` and earlier** run the backend-install probe (`python3 -c 'import anthropic'`) with
+  the audited repository as the working directory. Python puts the cwd on `sys.path` for `-c`, so
+  an audited package that ships its own `anthropic.py` executes in your runner — one step before
+  `ANTHROPIC_API_KEY` enters the job, and the payload *satisfies* the probe, so the guard passes
+  while it runs. Even where the key is withheld (fork PRs on public repos), that execution happens
+  before the severity gate and can neutralise the gate judging it.
+- **`v0.5.0` and `v0.6.0`** additionally interpolate caller inputs straight into `run:` scripts, so
+  a crafted `model` or `fail-on` value executes in the same key-bearing job. `v0.6.0` also defaults
+  to the `claude-api` backend while installing only aider, so its default run dies mid-audit on a
+  missing `anthropic`. (`v0.5.0` predates that backend — only the injection affects it.)
+
+If `v0.7.1` is not tagged yet, pin a commit SHA from the kit's `main` instead of dropping back to
+an older tag — a SHA is just as reproducible and does not carry the vulnerable workflow.
 
 ## 2. Add the secret
 
@@ -53,7 +60,7 @@ On every PR (and on demand via *Run workflow*) it:
 2. uploads both as a build artifact (`pre-audit-report`);
 3. **fails the check** if any finding is at or above `fail-on` (default `high`).
 
-Pin `kit-ref:` to a released tag (e.g. `v0.7.0`) so the *method* is fixed over time: the
+Pin `kit-ref:` to a released tag (e.g. `v0.7.1`) so the *method* is fixed over time: the
 static-tier findings then reproduce exactly, while the LLM-tier findings are advisory and
 vary run-to-run, so don't expect a byte-identical report.
 

@@ -1,0 +1,36 @@
+# What goes into the sdist.
+#
+# Without this file setuptools falls back to its distutils-era defaults, which ship bin/*.py and
+# test*.py and nothing else — no tests/__init__.py (so `unittest discover` cannot even import the
+# suite), no schema/, no prompts/, no examples/. The sdist then carries a test suite guaranteed to
+# fail on arrival, which is exactly what a downstream packager (conda-forge, Debian, Nix, a
+# corporate mirror) builds and tests from.
+#
+# For a security tool this is also a supply-chain property, not just a packaging nicety: shipping
+# the fixtures and schemas the tests assert against is what lets someone verify from source that
+# the sdist behaves like the repo, instead of taking the wheel on trust.
+
+include VERSION
+include audit.sh
+include Makefile
+include *.md
+include .markdownlint.json
+
+# The reusable workflows are a deliverable, not just repo plumbing — consumers `uses:` them, and
+# tests/test_security.py asserts security properties of pre-audit.yml. Ship them so the sdist can
+# both verify itself and show what callers are actually invoking.
+recursive-include .github/workflows *.yml
+
+recursive-include tests *.py
+recursive-include schema *.json
+recursive-include prompts *.md
+recursive-include references *.md
+recursive-include docs *.md
+recursive-include examples *
+graft attestation
+
+# Build/VCS noise that must never reach the sdist.
+global-exclude *.py[cod]
+global-exclude .DS_Store
+prune attestation/target
+prune audit-reports
