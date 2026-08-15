@@ -13,6 +13,7 @@ help:
 	@echo "Targets:"
 	@echo "  audit TARGET=<path>    Run a pre-audit pass over a scrypto package."
 	@echo "  lint                   Lint the harness (shellcheck) and prompts/refs (markdownlint)."
+	@echo "  test                   Run the unit-test suite."
 	@echo "  check-deps             Verify aider + supporting tools are installed."
 	@echo "  refresh-refs           (operator-only) Re-export reference docs from a curator's notes."
 	@echo ""
@@ -39,7 +40,7 @@ test:
 	python3 -m unittest discover -s tests -t .
 
 check-deps:
-	@command -v aider     >/dev/null && echo "aider:     $$(aider --version)"        || echo "aider:     MISSING (pip install aider-chat)"
+	@command -v aider     >/dev/null && echo "aider:     $$(aider --version)"        || echo "aider:     absent (only the deepseek/both cross-model modes need it)"
 	@command -v bash      >/dev/null && echo "bash:      $$(bash --version | head -1)" || echo "bash:      MISSING"
 	@command -v awk       >/dev/null && echo "awk:       present"                    || echo "awk:       MISSING"
 	@command -v find      >/dev/null && echo "find:      present"                    || echo "find:      MISSING"
