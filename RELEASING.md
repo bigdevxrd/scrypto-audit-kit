@@ -34,18 +34,37 @@ as a repo secret.
    npx markdownlint-cli@0.39.0 README.md CHANGELOG.md RELEASING.md docs/   # CI pins this version
    ```
 
-3. Commit, then tag and push:
+3. Land the bump **through a PR**. `main` is covered by a ruleset requiring the four status
+   checks, so a direct `git push origin main` is rejected:
 
    ```bash
+   git checkout -b release/v$(cat VERSION)
    git commit -am "release v$(cat VERSION)"
-   git tag "v$(cat VERSION)"
-   git push origin main --tags
+   git push -u origin HEAD
+   gh pr create --fill && gh pr merge --squash --delete-branch
    ```
 
-4. Draft a **GitHub Release** for that tag (**Releases → Draft a new release → choose the tag →
+4. Tag the merged commit on `main` and push the tag:
+
+   ```bash
+   git checkout main && git pull
+   git tag "v$(cat VERSION)"
+   git push origin "v$(cat VERSION)"
+   ```
+
+   Release tags (`v*`) are protected: they cannot be moved or deleted once pushed. If you tag the
+   wrong commit, cut the next patch version rather than trying to move it — which is the point.
+   Immutable tags are what makes "pin `kit-ref` to a tag" real advice instead of a suggestion.
+
+5. Draft a **GitHub Release** for that tag (**Releases → Draft a new release → choose the tag →
    paste the CHANGELOG section → Publish**).
-5. Publishing the release triggers [release.yml](.github/workflows/release.yml): it checks the
-   tag matches `VERSION`, builds the sdist + wheel, and publishes to PyPI.
+
+   > Pushing the tag alone publishes **nothing** — [release.yml](.github/workflows/release.yml)
+   > triggers on `release: published`, not on tag push. This step is the one that ships.
+
+6. Publishing the release runs [release.yml](.github/workflows/release.yml): it re-runs the suite
+   against the tagged tree, checks the tag matches `VERSION`, builds the sdist + wheel,
+   smoke-tests both, and only then publishes to PyPI.
 
 ## Verify the published release
 
