@@ -35,7 +35,7 @@ Anything unchecked is fair game — open an issue to claim it.
 - [x] Hybrid static-analysis pass — 14 high-precision rules, a free `--static-only` tier, and the `static_scan` tool ([docs/static-analysis.md](docs/static-analysis.md))
 - [x] Property-test generation — compilable `#[ignore]` scrypto-test scaffolds + the `propose_tests` tool
 
-## Phase 4 — Verifiable & connected 🚧 (v0.4)
+## Phase 4 — Verifiable & connected 🚧 (v0.4, still open)
 
 - [x] On-chain attestation blueprint — type-checks + CI-compiled, **not yet deployed/audited** (soulbound; source-hash anchor) + the `attest.py` manifest bridge ([attestation/](attestation/))
 - [ ] Build/deploy the registry to Stokenet + a public dashboard of attested blueprints
@@ -50,6 +50,39 @@ Anything unchecked is fair game — open an issue to claim it.
 - [x] Guarded relative cross-imports, and no `sys.path` insert in `bin/__init__.py` — importing the
   package is side-effect free and can no longer shadow a consumer's own top-level modules
   ([#5](https://github.com/bigdevxrd/scrypto-audit-kit/issues/5))
+
+## Phase 6 — Interchangeable backends ✅ (v0.6)
+
+- [x] `audit.sh` dispatches to a pluggable **backend** behind a stable contract — the LLM pass is
+  no longer welded to aider ([docs/backends.md](docs/backends.md))
+
+## Phase 7 — CI hardening and rule precision ✅ (v0.7)
+
+- [x] Closed argument injection in the reusable workflow, and installed the backend it defaults to
+  — **v0.7.0 is a floor for CI callers, not just the newest tag**
+- [x] Static-rule precision pass
+
+## Phase 8 — Honest claims ✅ (v0.8)
+
+- [x] Attestations record **facts, not a trust level** — the old `level` field conflated "which
+  tiers ran" with "who witnessed the run", and failed *upward*. Breaking change to the payload
+  and the blueprint ([docs/attestation-levels.md](docs/attestation-levels.md))
+- [x] Analyzer no longer fails open; the distribution can test itself
+- [x] **v0.8.0 supersedes v0.7.0 as the CI floor**
+
+## Next
+
+- [ ] Deploy the attestation registry to Stokenet + a public dashboard (Phase 4 remainder)
+- [ ] Auditor partnership (pre-audit funnel) + Radix grant
+- [ ] Wire `--structured` into `audit.sh` and flip it on by default, once the parity check passes
+- [ ] Real-world shakedown — drive the audit → fix → verify loop on a live blueprint end-to-end
+- [ ] First trial reports against **public** blueprints *(help wanted)*
+
+> ⚠️ On that last one: three trial reports already exist, but they are pre-audits of **our own
+> private blueprints** (guild escrow, meme-game vault, meme-grid NFTs, all 2026-07-18) and are
+> deliberately unlanded. Publishing a findings report against live code we operate discloses its
+> vulnerabilities. They do not satisfy this item and must not be committed here — the item needs
+> a *third-party public* blueprint.
 
 ---
 
