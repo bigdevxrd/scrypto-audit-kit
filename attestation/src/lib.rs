@@ -149,6 +149,13 @@ mod attestation_registry {
         }
 
         /// Record an attestation and mint its soulbound NFT (deposit it to keep the receipt).
+        ///
+        /// PERMISSIONLESS BY DESIGN, and the rule below is right to ask. `attest` is declared
+        /// PUBLIC, takes no credential and mints — the exact shape `public-privileged-method`
+        /// flags. It is accepted here because a self-attestation establishes nothing about
+        /// itself: trust is derived by the reader from `mode` + `attester` + `issuer_verified`,
+        /// never from the record existing, and an unindexed self-attestation is inert. Anyone
+        /// paying their own fee to mint one is the intended behaviour, not a bypass.
         pub fn attest(&mut self, input: AttestationInput) -> Bucket {
             assert!(!input.source_hash.is_empty(), "source_hash is required");
             assert!(!input.report_hash.is_empty(), "report_hash is required");

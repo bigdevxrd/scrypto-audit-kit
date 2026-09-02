@@ -77,7 +77,7 @@ class TestMcpTools(unittest.TestCase):
 
     def test_static_scan(self):
         res = mcp_server.static_scan(PKG)
-        self.assertEqual(res["count"], 5)
+        self.assertEqual(res["count"], 7)  # +2: public-privileged-method on the fixture
         self.assertTrue(all(f["source"] == "static" for f in res["findings"]))
 
     def test_show_finding_source(self):

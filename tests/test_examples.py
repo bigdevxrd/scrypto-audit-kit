@@ -30,18 +30,33 @@ class TestExampleAgents(unittest.TestCase):
             with self.subTest(script=os.path.basename(script)):
                 py_compile.compile(script, doraise=True)
 
-    def test_static_gate_passes_above_findings_fails_at_them(self):
-        # the fixture's static findings top out at medium
-        self.assertEqual(_run([STATIC_GATE, FIXTURE, "--fail-on", "high"]).returncode, 0)
-        self.assertEqual(_run([STATIC_GATE, FIXTURE, "--fail-on", "critical"]).returncode, 0)
+    def test_static_gate_fails_the_fixture_at_every_threshold_it_reaches(self):
+        # The fixture tops out at CRITICAL, not medium — so every threshold from critical down
+        # must fail. The old version of this test asserted the opposite at `high` and `critical`
+        # ("the fixture's static findings top out at medium"), which was true only because the
+        # ruleset could not see the two worst planted bugs.
+        self.assertEqual(_run([STATIC_GATE, FIXTURE, "--fail-on", "critical"]).returncode, 1)
+        self.assertEqual(_run([STATIC_GATE, FIXTURE, "--fail-on", "high"]).returncode, 1)
         self.assertEqual(_run([STATIC_GATE, FIXTURE, "--fail-on", "medium"]).returncode, 1)
+        # `--fail-on critical` firing here is itself new: before this rule, NO rule in the
+        # ruleset emitted `critical`, so that threshold was vacuous by construction and could
+        # never fail on any package at all.
+        self.assertEqual(_run([STATIC_GATE, FIXTURE, "--fail-on", "none"]).returncode, 0)
 
     def test_static_gate_rejects_bad_threshold(self):
         self.assertEqual(_run([STATIC_GATE, FIXTURE, "--fail-on", "bogus"]).returncode, 2)
 
     def test_static_gate_runs_on_bundled_fixture_by_default(self):
-        # no path arg -> uses the bundled fixture; medium findings pass a high gate
-        self.assertEqual(_run([STATIC_GATE]).returncode, 0)
+        # No path arg -> the bundled fixture, which is DELIBERATELY CRITICAL: it plants
+        # `emergency_drain => PUBLIC` and `set_oracle_price => PUBLIC`, and its committed
+        # reference report rates both Critical.
+        #
+        # ⚠️ THIS ASSERTION WAS INVERTED (expected 0, "medium findings pass a high gate") until
+        # `public-privileged-method` landed. That was the blind spot written down as an
+        # expectation: the shipped example agent, run exactly as documented, printed
+        # "PASS: nothing at/above 'high'" over a package with a public unbounded drain, and this
+        # test asserted that it should. A gate that cannot fail on this fixture is not a gate.
+        self.assertEqual(_run([STATIC_GATE]).returncode, 1)
 
     def test_audit_fix_verify_walks_the_free_tier_loop(self):
         env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
