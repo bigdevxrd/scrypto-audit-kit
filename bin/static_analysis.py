@@ -339,6 +339,7 @@ def r_todo_comment(ctx):
 
 _BLUEPRINT_RE = re.compile(r"#\[\s*(?:\w+::)*blueprint\s*\]")  # also matches #[scrypto::blueprint]
 _MOD_OPEN_RE = re.compile(r"\bmod\s+\w+\s*\{")
+_IMPL_OPEN_RE = re.compile(r"\bimpl\s+[^{;]*\{")
 
 
 def _brace_span_end(text, open_idx):
@@ -386,6 +387,7 @@ def _method_auth_index(text):
         body_start = mod_match.start()
         body_end = _brace_span_end(text, mod_match.end() - 1)
         decls = {}
+        scope_start, scope_end = body_start, body_end
         auth = _ENABLE_METHOD_AUTH_RE.search(text, body_start, body_end)
         if auth:
             methods = _METHODS_OPEN_RE.search(text, auth.end(), _brace_span_end(text, auth.end() - 1))
@@ -393,7 +395,23 @@ def _method_auth_index(text):
                 block = text[methods.end():_brace_span_end(text, methods.end() - 1) - 1]
                 for entry in _AUTH_ENTRY_RE.finditer(block):
                     decls[entry.group(1)] = "restricted" if "restrict_to" in entry.group(2) else "public"
-        index.append((body_start, body_end, decls))
+            # 🔴 SCOPE THE METHOD LOOKUP TO THE `impl` BLOCK THAT OWNS THIS MACRO.
+            #
+            # Rust lets arbitrary nested items — a helper `mod`, an unrelated struct's `impl`,
+            # a trait default method — share a name with a component method inside the same
+            # `#[blueprint] mod`. Resolving a declared method name against the WHOLE mod body
+            # takes the FIRST `pub fn <name>(` in it, so any earlier same-named function
+            # hijacks the analysis. Adversarial review demonstrated both outcomes on ordinary-
+            # looking Rust: a decoy carrying a `Proof` parameter suppressed a real critical
+            # entirely, and a harmless decoy setter was reported at ITS line with ITS severity
+            # while the real unguarded drain went unmentioned — actively misdirecting a
+            # reviewer, which is worse than reporting nothing.
+            for im in _IMPL_OPEN_RE.finditer(text, body_start, body_end):
+                im_end = _brace_span_end(text, im.end() - 1)
+                if im.start() <= auth.start() < im_end:
+                    scope_start, scope_end = im.start(), im_end
+                    break
+        index.append((scope_start, scope_end, decls))
     return index
 
 
@@ -403,6 +421,176 @@ def _declared_auth(index, offset, method):
         if start <= offset < end:
             return decls.get(method)
     return None
+
+
+_PUB_FN_RE_TMPL = r"\bpub\s+fn\s+{}\s*(?:<[^>]*>)?\s*\("
+_CREDENTIAL_PARAM_RE = re.compile(r"\b(Proof|Bucket|NonFungibleBucket|FungibleBucket|NonFungibleProof|FungibleProof)\b")
+# What counts as "this method authorises itself". Deliberately BROAD: a false negative here
+# costs recall, which this ruleset explicitly trades away ("prefer to miss over to over-flag"),
+# while a false positive costs a CRITICAL on correct code — the failure that trains reviewers
+# to ignore the rule. Adversarial review found the original four-token list flagged three
+# correctly-authorised idioms, one of them at critical: an identity check on a
+# NonFungibleGlobalId parameter, a Runtime::global_caller() callback gate, and a Clock-based
+# time gate (the PULL settlement shape this fleet's own escrow uses).
+_INBODY_AUTH_RE = re.compile(
+    r"resource_address\s*\(\s*\)|authorize_with_amount|authorize_with_all|"
+    r"Runtime::assert_access_rule|assert_access_rule|require\s*\(|"
+    r"\bassert(?:_eq|_ne)?\s*!|Runtime::global_caller|Clock::current_time_is")
+_VAULT_TAKE_RE = re.compile(r"\.take(?:_all|_advanced)?\s*\(")
+_MINT_BURN_RE = re.compile(r"\.(mint|mint_initial_supply|mint_non_fungible|mint_ruid_non_fungible|burn)\s*\(")
+_STATE_WRITE_RE = re.compile(r"\bself\.\w+\s*=(?!=)")
+_RETURNS_VALUE_RE = re.compile(r"->\s*[^{;]*\b(Bucket|NonFungibleBucket|FungibleBucket)\b")
+
+
+def _param_names(params):
+    """Bare parameter identifiers from a parameter list, excluding the self receiver."""
+    names = []
+    for part in params.split(","):
+        part = part.strip()
+        if not part or part.startswith("&") or part in ("self", "mut self"):
+            continue
+        m = re.match(r"(?:mut\s+)?(\w+)\s*:", part)
+        if m:
+            names.append(m.group(1))
+    return names
+
+
+def _writes_from_param(body, params):
+    """True if a `self.x = …` in `body` draws on a method parameter.
+
+    External input is what makes a state write privileged. A method that memoizes its OWN
+    computed value (`self.cached = self.compute()`) is a getter, not an oracle setter, and
+    adversarial review flagged exactly that shape as a false positive under the rule's
+    `the classic case is a public oracle setter` wording. A method with no parameters at all
+    cannot be fed anything by its caller, so it is never a privileged write by this test.
+    """
+    names = _param_names(params)
+    if not names:
+        return False
+    for m in re.finditer(r"\bself\.\w+\s*=(?!=)([^;]*)", body):
+        rhs = m.group(1)
+        if any(re.search(r"\b" + re.escape(n) + r"\b", rhs) for n in names):
+            return True
+    return False
+
+
+def _fn_signature_and_body(text, name, lo, hi):
+    """(offset, params, return_type, body) for `pub fn <name>(` between lo..hi, or None.
+
+    Params and return type are returned SEPARATELY and never as one signature string —
+    see the note in the body about why that distinction is load-bearing."""
+    m = re.compile(_PUB_FN_RE_TMPL.format(re.escape(name))).search(text, lo, hi)
+    if not m:
+        return None
+    brace = text.find("{", m.end())
+    if brace == -1 or brace >= hi:
+        return None
+    # ⚠️ PARAMETER LIST ONLY, never the whole signature. `pub fn emergency_drain(&mut self)
+    # -> Bucket` mentions Bucket in its RETURN type; matching credential types against the
+    # full signature read that as "a Bucket was presented" and skipped the single worst
+    # method in this kit's own fixture. Caught only because the acceptance bar was "detect
+    # the fixture", not "fire more often".
+    params_end = _brace_span_end(text[: brace].replace("(", "{").replace(")", "}"), m.end() - 1) - 1
+    params = text[m.end():params_end] if params_end > m.end() else ""
+    ret = text[params_end + 1:brace] if params_end + 1 < brace else ""
+    return m.start(), params, ret, text[brace:_brace_span_end(text, brace)]
+
+
+@rule
+def r_public_privileged_method(ctx):
+    """A method the blueprint DECLARES `=> PUBLIC` that moves value or writes privileged
+    state while accepting no credential and asserting nothing.
+
+    🔴 WHY THIS RULE EXISTS, and why it is separate from r_missing_method_auth.
+    That rule fires only when `enable_method_auth!` is ABSENT. It never inspects what the
+    macro DECLARES, so a blueprint that has the macro and writes `emergency_drain => PUBLIC`
+    was reported clean by the only high-severity auth rule in the ruleset — including on
+    this kit's OWN `examples/vulnerable-vault` fixture, whose committed reference report
+    rates that exact method Critical. One gated method vouched for every other method in the
+    blueprint, which is the same shape as the per-file/per-blueprint bug fixed in July one
+    level up.
+
+    ⚠️ WHAT THIS RULE DOES NOT CATCH — measured by adversarial review, not guessed. It is a
+    TEXTUAL, SINGLE-FUNCTION check with no call graph and no notion of whether a token was
+    actually used to make an authorization decision, so all of the following slip past and are
+    accepted as the cost of precision (this ruleset trades recall away by design; recall is the
+    LLM pass's job):
+      • INDIRECTION. `pub fn drain(&mut self) -> Bucket { self.do_drain() }` with the
+        `take_all()` one call away in a private helper. Same for a state write via a helper —
+        that one produces no finding from ANY rule in the ruleset.
+      • DECOY CREDENTIALS. An unused `Bucket`/`Proof` parameter that is never inspected buys
+        silence, because the check is "is a credential type named in the parameter list", not
+        "is it used to authorize".
+      • DECOY ASSERTIONS. A discarded `let _ = x.resource_address();`, or a private no-op
+        `fn require(&self, _: bool) {}`, satisfies the in-body auth test.
+      • ANY ASSERT EXCLUDES. Since `assert!` had to be accepted as an auth idiom (it is how
+        most hand-written Scrypto access checks are written), a method whose only assert is
+        unrelated input validation is also excluded. This is the single largest recall cost
+        here and it is deliberate: the alternative was a CRITICAL on correctly-authorized code.
+    A determined author can evade this rule with ordinary-looking Rust. It is a pre-audit aid
+    against carelessness, not a proof, and the kit says so at the top of its README.
+
+    PRECISION IS THE WHOLE DIFFICULTY. `PUBLIC` is not a defect by itself: a great many
+    correct Scrypto methods are public and authorise in the body instead — presenting a
+    `Proof`, burning a `Bucket`, or asserting a resource address. Firing on all of them
+    would reproduce this ruleset's other failure mode (see `unbounded-take-all`, which fires
+    13x on a blueprint where `take_all()` is the deliberately safe pattern). So a method is
+    only flagged when it takes NO credential parameter AND performs NO in-body access
+    assertion — which is exactly what separates the fixture's `emergency_drain(&mut self)`
+    from its `withdraw(&mut self, shares: Bucket)`.
+    """
+    s = ctx["stripped"]
+    index = _method_auth_index(s)
+    for body_start, body_end, decls in index:
+        for method, declared in sorted(decls.items()):
+            if declared != "public":
+                continue
+            found = _fn_signature_and_body(s, method, body_start, body_end)
+            if not found:
+                continue
+            fn_at, params, ret, body = found
+            # A credential PARAMETER, or an access assertion in the body, means the method
+            # authorises itself. That is the normal, correct Scrypto pattern.
+            #
+            # ⚠️ Params and return type are tested SEPARATELY and this is load-bearing.
+            # `pub fn emergency_drain(&mut self) -> Bucket` names Bucket in its RETURN type;
+            # an earlier draft matched credential types against the whole signature, read
+            # that as "a Bucket was presented", and silently skipped the single worst method
+            # in this kit's own fixture. It still fired on `set_oracle_price`, so a check of
+            # "does the rule now find more?" would have passed while the Critical stayed
+            # invisible. Only "does it detect the fixture's NAMED defects?" caught it.
+            if _CREDENTIAL_PARAM_RE.search(params) or _INBODY_AUTH_RE.search(body):
+                continue
+            # Line from the `pub fn` match offset, never by searching for the params text:
+            # `&mut self` is identical across most methods, so a text search reports the
+            # FIRST such method in the file and points a reviewer at the wrong one.
+            line = _line_of(s, fn_at)
+            # No longer AND-ed with the return type: a drain returned inside a named struct
+            # (`-> DrainResult { funds: … }`) defeated that proxy entirely. Taking from a vault
+            # in an uncredentialed public method is the signal; where the value goes next is not
+            # something a textual rule can follow.
+            drains = _VAULT_TAKE_RE.search(body)
+            mints = _MINT_BURN_RE.search(body)
+            if drains or mints:
+                what = ("moves value out of the component with no credential and no assertion"
+                        if drains else
+                        "mints or burns with no credential and no assertion")
+                yield _f(line, "public-privileged-method", "critical", "Auth bypass",
+                         f"`{method}` is declared PUBLIC and {what}",
+                         f"`enable_method_auth!` declares `{method} => PUBLIC`, its signature takes no "
+                         "Proof or Bucket, and its body asserts no access rule.",
+                         "Any caller can invoke it and take the proceeds. Declaring the macro does not "
+                         "gate a method the macro itself opens.",
+                         f"Restrict `{method}` to the least-privileged role, or authorise it in the body "
+                         "by requiring a Proof of the owning badge.")
+            elif _STATE_WRITE_RE.search(body) and _writes_from_param(body, params):
+                yield _f(line, "public-privileged-method", "high", "Auth bypass",
+                         f"`{method}` is declared PUBLIC and writes component state uncredentialed",
+                         f"`enable_method_auth!` declares `{method} => PUBLIC`, its signature takes no "
+                         "Proof or Bucket, and its body assigns to `self.*` with no access assertion.",
+                         "Any caller can set it. Where the value feeds pricing, fees or roles, that is a "
+                         "direct economic lever — the classic case is a public oracle setter.",
+                         f"Restrict `{method}` to the least-privileged role, or require a Proof in the body.")
 
 
 @rule

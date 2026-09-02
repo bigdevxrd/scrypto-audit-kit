@@ -25,7 +25,13 @@ class TestFixture(unittest.TestCase):
         cls.findings = sa.analyze_package(PKG)
 
     def test_finding_count(self):
-        self.assertEqual(len(self.findings), 5)
+        # 5 -> 7 when `public-privileged-method` landed. The old golden set ENCODED THE BLIND
+        # SPOT: the fixture plants `set_oracle_price => PUBLIC` and `emergency_drain => PUBLIC`,
+        # its own committed reference report (examples/vulnerable-vault.pre-audit.md) rates BOTH
+        # Critical, and the analyzer detected neither — so this oracle asserted a clean bill over
+        # the fixture's two worst planted bugs. An expectation that matches a broken analyzer is
+        # not a passing test.
+        self.assertEqual(len(self.findings), 7)
 
     def test_rules_and_locations(self):
         got = {(f["rule"], f["location"]) for f in self.findings}
@@ -35,6 +41,9 @@ class TestFixture(unittest.TestCase):
             ("raw-decimal-arith", "src/lib.rs:86"),
             ("raw-decimal-arith", "src/lib.rs:98"),
             ("unbounded-take-all", "src/lib.rs:120"),
+            # The two the reference report rates Critical, invisible to the ruleset until now.
+            ("public-privileged-method", "src/lib.rs:111"),  # set_oracle_price
+            ("public-privileged-method", "src/lib.rs:119"),  # emergency_drain
         })
 
     def test_schema_shape(self):
@@ -46,7 +55,8 @@ class TestFixture(unittest.TestCase):
             self.assertTrue(f["suggested_direction"])
 
     def test_ids_sequential(self):
-        self.assertEqual([f["id"] for f in self.findings], ["S-001", "S-002", "S-003", "S-004", "S-005"])
+        self.assertEqual([f["id"] for f in self.findings],
+                         ["S-001", "S-002", "S-003", "S-004", "S-005", "S-006", "S-007"])
 
     def test_no_false_positives(self):
         # the fixture has enable_method_auth!, no floats/addresses/panics/unsafe
@@ -495,3 +505,92 @@ class TestHandRolledAddressCheck(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPublicPrivilegedMethod(unittest.TestCase):
+    """Regression gates for the two defect classes adversarial review found in this rule.
+
+    Both were found by attacking the rule AFTER it passed the fixture-detection bar, which is
+    the point: "it detects the fixture" proved it worked on the one case it was written
+    against, and nothing more.
+    """
+
+    def _hits(self, src):
+        findings = sa.analyze_text("src/lib.rs", src)
+        return [f for f in findings if f["rule"] == "public-privileged-method"]
+
+    def test_a_same_named_decoy_fn_does_not_hijack_attribution(self):
+        # A helper `mod`/sibling `impl` may legally share a name with a component method. The
+        # method lookup used to search the whole `#[blueprint] mod` body and take the FIRST
+        # match, so a decoy either suppressed the real critical outright or got reported at
+        # ITS line with ITS severity while the real drain went unmentioned — misdirecting a
+        # reviewer, which is worse than saying nothing.
+        src = """
+#[blueprint]
+mod vault {
+    struct AuditLog { last_note: String }
+    impl AuditLog {
+        pub fn emergency_drain(&mut self) { self.last_note = "x".to_string(); }
+    }
+    struct Vault { funds: Vault }
+    impl Vault {
+        enable_method_auth! { methods { emergency_drain => PUBLIC; } }
+        pub fn emergency_drain(&mut self) -> Bucket { self.funds.take_all() }
+    }
+}
+"""
+        hits = self._hits(src)
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0]["severity"], "critical")
+        # The REAL drain, not the decoy setter above it. `analyze_text` yields raw findings
+        # keyed `line`; `location` is added later by analyze_package.
+        self.assertIn("take_all", src.split("\n")[hits[0]["line"] - 1])
+
+    def test_authorised_idioms_do_not_fire(self):
+        # Each of these was a false positive found by adversarial review — one of them at
+        # CRITICAL, on code that is correctly access-checked. A false critical sits at the same
+        # severity as the fixture's real bug and is what trains reviewers to ignore the rule.
+        src = """
+#[blueprint]
+mod settle {
+    struct S { v: Vault, owner_id: NonFungibleGlobalId, paired: ComponentAddress, bal: Decimal, unlock_at: Instant, status: u8 }
+    impl S {
+        enable_method_auth! { methods {
+            withdraw_as_owner => PUBLIC;
+            on_callback => PUBLIC;
+            auto_resolve => PUBLIC;
+        } }
+        pub fn withdraw_as_owner(&mut self, caller_id: NonFungibleGlobalId) -> Bucket {
+            assert!(caller_id == self.owner_id, "not owner");
+            self.v.take_all()
+        }
+        pub fn on_callback(&mut self, amount: Decimal) {
+            assert!(Runtime::global_caller() == self.paired.into(), "unauthorized");
+            self.bal = self.bal + amount;
+        }
+        pub fn auto_resolve(&mut self) {
+            assert!(Clock::current_time_is_at_or_after(self.unlock_at, TimePrecision::Minute), "early");
+            self.status = 1;
+        }
+    }
+}
+"""
+        self.assertEqual(self._hits(src), [])
+
+    def test_a_parameterless_cache_write_is_not_a_privileged_write(self):
+        # A memoizing getter writes `self.*` but is fed nothing by its caller. External input
+        # is what makes a state write privileged; without a parameter there is none.
+        src = """
+#[blueprint]
+mod p {
+    struct P { cached: Decimal, last: Instant }
+    impl P {
+        enable_method_auth! { methods { get_price => PUBLIC; } }
+        pub fn get_price(&mut self) -> Decimal {
+            self.cached = self.compute();
+            self.cached
+        }
+    }
+}
+"""
+        self.assertEqual(self._hits(src), [])

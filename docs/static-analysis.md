@@ -26,7 +26,8 @@ deliberately **high-precision** (they prefer to miss over to over-flag); recall 
 | Rule | Severity | Class | Catches |
 |------|----------|-------|---------|
 | `float-usage` | high | Integer / decimal arithmetic | `f32`/`f64` types in on-ledger math |
-| `missing-method-auth` | high | Auth bypass | a `#[blueprint]` with `pub fn`s but no `enable_method_auth!` |
+| `missing-method-auth` | high | Auth bypass | a `#[blueprint]` with `pub fn`s but no `enable_method_auth!` — fires only on an ABSENT macro, never on what a present one declares |
+| `public-privileged-method` | **critical** / high | Auth bypass | a method the macro declares `=> PUBLIC` that moves value, mints/burns (critical) or writes `self.*` from a parameter (high) while taking no credential and asserting nothing. **Single-function and textual: indirection through a private helper, an unused credential parameter, or any unrelated `assert!` all evade it — see the rule's docstring for the measured list** |
 | `hardcoded-address` | medium | External calls / composability | bech32 address literals (`resource_rdx1…`) in source |
 | `hand-rolled-address-check` | medium | External calls / composability | `.starts_with("account_rdx1")` — an address accepted on its prefix, with no bech32m decode |
 | `unbounded-take-all` | medium | Resource handling | `.take_all()` — a whole-vault drain |

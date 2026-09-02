@@ -151,9 +151,9 @@ class TestSakLib(unittest.TestCase):
         # oracle: a full/merged run over the planted-bug fixture must surface all 5 static findings,
         # not 4 — the two `raw arithmetic` findings (src/lib.rs:86 and :98) must not collapse.
         static = static_analysis.analyze_package(PKG)
-        self.assertEqual(len(static), 5)
+        self.assertEqual(len(static), 7)  # +2: public-privileged-method on the fixture
         merged = sak_lib.merge_findings([], static)  # empty LLM appendix — pure static-into-hybrid merge
-        self.assertEqual(len(merged), 5)
+        self.assertEqual(len(merged), 7)  # +2: public-privileged-method on the fixture
         locs = {f["location"] for f in merged if f["rule"] == "raw-decimal-arith"}
         self.assertEqual(locs, {"src/lib.rs:86", "src/lib.rs:98"})
 
