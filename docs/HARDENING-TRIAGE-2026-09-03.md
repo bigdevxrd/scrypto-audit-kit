@@ -9,9 +9,17 @@ believed unmerged: `fix/ci-cwd-rce-and-packaging`, `fix/2026-08-13-bug-hunt-stat
 `mergedAt`, not the cached `gh pr view` render — see `reference_gh_pr_view_state_stale.md`) is the
 source of truth here, cross-checked with `git merge-base --is-ancestor` and, for the two branches
 that still exist locally, a byte-for-byte diff of the branch's own commit against the squash-merge
-commit on `main`. No branch carries any content that is not already on `main`. **No action taken
-on any branch** — this document is triage only, per instruction; merging, closing, or deleting is
-left to the operator.
+commit on `main`. **No action taken on any branch** — this document is triage only, per
+instruction; merging, closing, or deleting is left to the operator.
+
+Scoped claim, stated precisely because the unscoped version of it was wrong once already (see the
+addendum below): no branch **among the four named in R7** carries any content that is not already
+on `main`. This document also *names*, without checking, two further non-dependabot branches still
+sitting on `origin` (`fix/public-privileged-method-rule`, `harden/2026-07-16-critical-highs`) — see
+the "Branch today" line under `fix/ci-cwd-rce-and-packaging` just below. A later pass (2026-09-04)
+checked both; the addendum after the branch-by-branch section has the evidence. The answer turned
+out to be the same — already on `main` — but that was verified, not assumed, and it does not
+follow automatically from the four-branch result above.
 
 ## Method
 
@@ -98,14 +106,81 @@ For each branch:
 - **Recommendation: delete the local branch.** Same reasoning as the static-analyzer branch above
   — fully subsumed, safe to drop, flagged for the operator rather than deleted here.
 
+## Addendum (2026-09-04) — the two branches named above but not checked
+
+The "Branch today" line under `fix/ci-cwd-rce-and-packaging` says only
+`origin/fix/public-privileged-method-rule` and `origin/harden/2026-07-16-critical-highs` remain as
+non-dependabot remote branches — and stops there. Neither was in R7's scope, so neither got the
+check the four named branches got above. That gap is the same shape as the thing this triage exists
+to catch: a branch sitting on `origin` that *looks* live because nobody has actually checked it. It
+is closed here rather than left for a third pass to rediscover.
+
+### `origin/fix/public-privileged-method-rule`
+
+- **Branch today:** exists on `origin`, tip `99cd620`, "fix(static): detect PUBLIC privileged
+  methods — the kit missed both Criticals in its own fixture". Neither an ancestor of `origin/main`
+  nor the reverse — the two diverged at `fab5592` (the `docs: intent/status/roadmap sweep (#21)`
+  commit both branch and `main` share as their last common point).
+- **PR:** #23, same title, `fix/public-privileged-method-rule` → `main`, **MERGED**
+  2026-09-02T21:14:31Z, squash commit `4f3e2c05ae1df67134a76a6b31cc6ca0dd982ed5` — confirmed an
+  ancestor of `origin/main` (`git merge-base --is-ancestor 4f3e2c05 origin/main` → yes).
+- **Is the branch's content on `main`?** Yes, byte-for-byte: `git diff 99cd620 4f3e2c05` (branch
+  tip vs. the squash commit) produces **zero lines of output** — the trees are identical. The
+  branch is PR #23's own head ref, left behind after the squash merge; GitHub only auto-deletes a
+  head branch when that repo setting is on, and this one wasn't for this merge.
+- **Then why did it look unmerged?** Because the branch diverged instead of being an ancestor, the
+  two cheap checks both point the wrong way: `git merge-base --is-ancestor` correctly says "no,"
+  and a plain two-dot tip-to-tip diff (`git diff origin/main..origin/fix/public-privileged-method-rule`)
+  shows "1 commit ahead, 4 files changed, +15/-15" — which reads as live, unmerged content. It
+  isn't. Those 4 files are `.github/workflows/{blueprint,lint,pre-audit,release}.yml`, and the
+  +15/-15 is entirely the 5 dependabot Actions version bumps (`actions/checkout`,
+  `upload-artifact`, `attest-build-provenance`, `setup-python`, `setup-node` — PRs #13–#17) that
+  landed on `main` *after* 2026-09-02T21:14, which this abandoned branch never picked up — shown as
+  if reverting them, since a two-dot diff is symmetric and can't tell "the branch is behind" from
+  "the branch is ahead." This is the Method section's three-dot warning above, running in the
+  opposite direction: there, an old merge-base made a fully-merged branch's diff look artificially
+  *large*; here, a diverged-then-squashed branch's diff looks *small enough to be plausible new
+  work* when it's dependabot noise. Tip-to-tip diffing a branch that isn't an ancestor of `main`
+  is not a merge check either way — the byte-for-byte compare against the actual squash commit is
+  what settles it, same as the two locally-stale branches above.
+- **Independently re-verified on 2026-09-04, not just diffed:**
+  - `python3 -m unittest discover -s tests -t .` in a worktree at the branch tip — **227/227
+    pass** (Python 3.12; CI's other matrix leg, 3.9, was not available on this machine and was not
+    run) — matches the commit's own "227/227 tests pass" claim.
+  - `python3 bin/static_analysis.py examples/vulnerable-vault`, run at three points: at the
+    pre-fix merge-base `fab5592` — **5 findings, medium:5**, nothing higher; at the branch tip
+    `99cd620` — **7 findings: critical:1, high:1, medium:5**; at current `origin/main` (`a854f90`)
+    — **identically 7: critical:1, high:1, medium:5**. The two new findings in both post-fix runs
+    are `public-privileged-method` at `src/lib.rs:119` (critical, `emergency_drain`, drains the
+    vault with no credential) and `src/lib.rs:111` (high, `set_oracle_price`, writes `self.*` from
+    a parameter with no credential) — the exact two methods
+    `examples/vulnerable-vault.pre-audit.md` rates Critical, and that the commit message says the
+    ruleset missed before this rule existed.
+  - **No new PR was opened for this.** There is nothing to land — `main` has carried this fix
+    since 2026-09-02T21:14:31Z, three weeks before this triage ran.
+- **Recommendation: delete the stale remote branch.** Flagged for the operator
+  (`git push origin --delete fix/public-privileged-method-rule`) rather than done here, on the same
+  standard this document already holds itself to for the two stale local branches above — deleting
+  a branch is an operator/PR action, not a triage action.
+
+### `origin/harden/2026-07-16-critical-highs`
+
+- **Branch today:** exists on `origin`, tip `2b555da`, "docs: retire the dated bug-hunt writeup".
+- **Is it on `main`?** Yes, and trivially — unlike the branch above, this one is a straight
+  ancestor: `git merge-base --is-ancestor origin/harden/2026-07-16-critical-highs origin/main` →
+  yes. No divergence, no squash to chase, nothing further to check.
+- **Recommendation: delete the stale remote branch.** Same as above — flagged, not actioned.
+
 ## Bottom line for R7
 
 Hardening work already landed for all four items named in the ruling; there is no unmerged
 security or correctness fix sitting on a branch. The two branches that still exist locally are
 harmless (identical content to what shipped), but they are stale enough that they cost a future
 session real time re-deriving "is this actually unmerged?" — which is exactly what happened here.
-The only follow-up this triage recommends is housekeeping: drop the two stale local branches once
-the operator has independently confirmed the diffs above.
+The two remote branches in the addendum above cost exactly that: this document named them on first
+pass and moved on, and a later session had to re-derive from scratch that they, too, are fully
+subsumed. The only follow-up this triage recommends is housekeeping: drop all four stale branches
+(two local, two remote) once the operator has independently confirmed the diffs above.
 
-This triage did not surface a reason to delay announcing SAK on hardening grounds — the four named
-items are not open work.
+This triage did not surface a reason to delay announcing SAK on hardening grounds — none of the six
+branches it now covers are open work.
