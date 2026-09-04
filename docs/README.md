@@ -16,6 +16,7 @@ Start with what you want to do.
 | Pick or plug in the LLM engine (claude-api · aider · your own agent) | [backends.md](backends.md) |
 | Gate every PR on a pre-audit and show a badge | [ci.md](ci.md) |
 | Read an attestation honestly — what it proves, and what rung it earns | [attestation-levels.md](attestation-levels.md) |
+| Run the dapp-scope operator questionnaire — what a package audit can't see (data sources, admin keys, incident response) | [dapp-scope-checklist.md](../prompts/dapp-scope-checklist.md) · [questionnaire schema](../schema/dapp-scope-questionnaire.schema.json) · [worked example](../examples/dapp-scope/) |
 
 ## Build on it
 
