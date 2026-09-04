@@ -198,6 +198,29 @@ audit→fix→verify loop, and an MCP client — are in [examples/agents/](https
 - **Property tests.** `propose_tests` (or `python3 bin/gen_tests.py <pkg>`) emits compilable `#[ignore]`d `scrypto-test` scaffolds for the coverage gaps — auth negative-paths, happy paths, a value invariant — so closing them is fill-in-the-blank.
 - **On-chain attestation (L3).** `attestation_payload` (or `python3 bin/attest.py <report.json>`) turns a report into a Radix transaction manifest that records an attestation on-ledger via the [attestation/](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/attestation/) registry blueprint — bound to your exact source hash (the deterministic anchor). A coverage record, not a safety guarantee, and for the LLM tier not byte-reproducible (see [attestation/README.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/attestation/README.md)).
 
+### Dapp-scope pass (operator questionnaire)
+
+Everything above audits one Scrypto package's own source. A dapp losing money is usually a data
+source, a listing, an admin key, or an incident response gap around the package, not a defect in
+it — see [docs/DAPP-SCOPE-EXTENSION.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/DAPP-SCOPE-EXTENSION.md)
+for why. The first slice of that proposal is a structured questionnaire an operator (not the kit)
+fills in, and a deterministic CLI that turns it into a report:
+
+```bash
+sak-dapp-scope examples/dapp-scope/questionnaire.example.json    # or: python3 bin/dapp_scope.py <path>
+```
+
+It validates your answers against [schema/dapp-scope-questionnaire.schema.json](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/schema/dapp-scope-questionnaire.schema.json)
+(see the example alongside it and [prompts/dapp-scope-checklist.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/prompts/dapp-scope-checklist.md)
+for the questions it's asking) and renders a markdown report with a freshness marker — the
+`answered_at` date, because organizational facts go stale the day a listing is added or an admin
+key rotates, which the kit has no way to detect on its own. Every listed data source, listing, and
+admin power carries a required "max loss if this one input is maximally wrong" answer; **"no bound
+exists" is rendered as a finding, never left silent.** This pass is **not automatic, not merged
+into the eleven-class blueprint checklist, and not scored under the L1–L4 attestation ladder** —
+see [docs/attestation-levels.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/docs/attestation-levels.md).
+The rest of the proposal (an MCP tool, a real-world trial run) is still open.
+
 ## What's in the kit
 
 ```

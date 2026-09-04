@@ -4,6 +4,23 @@ Notable changes to scrypto-audit-kit. The kit version lives in [VERSION](VERSION
 stamped into every report; this log follows [Keep a Changelog](https://keepachangelog.com) and
 [SemVer](https://semver.org). The kit was built in a compressed timeline — dates reflect that.
 
+## [Unreleased]
+
+### Added
+
+- **Dapp-scope pass, first slice** ([docs/DAPP-SCOPE-EXTENSION.md](docs/DAPP-SCOPE-EXTENSION.md))
+  — a parallel prompt/checklist (`prompts/dapp-scope-checklist.md`) covering the four surfaces a
+  source-only audit can't see (data sources, listing/registry config, admin powers, operational
+  response) plus the §3 cross-cutting "max loss under one maximally-wrong input" question; a
+  structured JSON questionnaire schema (`schema/dapp-scope-questionnaire.schema.json`) with a
+  worked example (`examples/dapp-scope/questionnaire.example.json`); and a deterministic
+  `sak-dapp-scope` CLI (`bin/dapp_scope.py`) that validates a filled-in questionnaire and renders
+  a markdown + JSON report carrying its own freshness marker (`answered_at`). An "unbounded"
+  answer to the §3 question is rendered as a finding, never left silent. Deliberately **not**
+  wired into `prompts/checklist.md`, `schema/audit-report.schema.json`, the MCP tools, or the
+  L1–L4 attestation ladder ([docs/attestation-levels.md](docs/attestation-levels.md)) — this is
+  organizational fact answered by an operator, not source, and the report says so.
+
 ## [0.8.0] — 2026-08-15 — honest claims, and the rest of the CI hole
 
 v0.7.0 closed argument injection in the reusable workflow. A post-release adversarial sweep found
