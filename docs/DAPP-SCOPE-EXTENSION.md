@@ -1,7 +1,7 @@
 # Scoping the kit to a dapp, not just a blueprint — a proposal
 
 **Date:** 2026-09-03
-**Status:** First slice shipped in PR #PLACEHOLDER — `prompts/dapp-scope-checklist.md`, the
+**Status:** First slice shipped in PR #25 — `prompts/dapp-scope-checklist.md`, the
 questionnaire schema (`schema/dapp-scope-questionnaire.schema.json`) with a worked example, and a
 deterministic `sak-dapp-scope` CLI (validate → render, "unbounded" is a finding per §3). Built
 exactly to the §5 shape below and nothing more: not wired into `prompts/checklist.md`,
