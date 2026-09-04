@@ -1,0 +1,40 @@
+# gitleaks config — scrypto-audit-kit
+# Secret-scanning guardrail, run in CI (secret-scan.yml). Pinned to gitleaks
+# 8.30.x semantics. This repository is public — nothing in this file should
+# ever need to reference a real credential; every entry below exists to
+# describe an obviously-fake value precisely enough that a real secret of the
+# same general shape still trips the scanner.
+#
+# Baseline (2026-09-05): a full-history scan (63 commits) found zero leaks.
+# This file ships anyway so a future doc example or test fixture has a place
+# to be allowlisted *by exact value*, not by broadening a whole path.
+
+title = "scrypto-audit-kit gitleaks config"
+
+[extend]
+# Inherit gitleaks' full default ruleset, then narrow with the allowlist below.
+useDefault = true
+
+[allowlist]
+description = "Known non-secret placeholders and example files"
+
+# Example env files are documentation, not real secrets. A real .env is
+# gitignored and never committed.
+paths = [
+  '''\.env\.example$''',
+  '''\.env\.sample$''',
+]
+
+# Match against the captured secret value, not the file path, so a real
+# secret landing in a doc or test still trips the scanner.
+regexTarget = "match"
+regexes = [
+  # Doc placeholders: YOUR_API_KEY / YOUR_TOKEN / YOUR_SECRET / YOUR_BEARER_TOKEN
+  '''YOUR_(?:API_KEY|TOKEN|SECRET|BEARER_TOKEN|BEARER)''',
+  # Sequential/obvious test fixtures
+  '''abcdef1234567890''',
+  '''test-api-key-[A-Za-z0-9]+''',
+  # Mock JWTs whose signature segment is the literal word "signature"
+  # (a real JWT carries a base64 HMAC/RSA signature, never that literal word).
+  '''eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.signature''',
+]
