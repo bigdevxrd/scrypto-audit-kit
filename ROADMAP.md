@@ -72,6 +72,11 @@ Anything unchecked is fair game — open an issue to claim it.
 
 ## Next
 
+- [x] Dapp-scope pass, first slice — questionnaire schema, parallel checklist prompt, and a
+      deterministic `sak-dapp-scope` report (validate → render, "unbounded" is a finding). Not
+      wired into the blueprint checklist, `report.json`, the MCP tools, or the L1–L4 attestation
+      ladder. See [docs/DAPP-SCOPE-EXTENSION.md](docs/DAPP-SCOPE-EXTENSION.md) — remaining: an
+      MCP tool, a real-world trial questionnaire, docs indexing
 - [ ] Deploy the attestation registry to Stokenet + a public dashboard (Phase 4 remainder)
 - [ ] Auditor partnership (pre-audit funnel) + Radix grant
 - [ ] Wire `--structured` into `audit.sh` and flip it on by default, once the parity check passes

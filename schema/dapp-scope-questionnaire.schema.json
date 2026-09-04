@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/schema/dapp-scope-questionnaire.schema.json",
+  "title": "scrypto-audit-kit dapp-scope questionnaire",
+  "description": "Structured operator intake for the dapp-scope pass (docs/DAPP-SCOPE-EXTENSION.md). This is organizational fact, not source: it has no source_hash, is answered by a human (or the dapp's own operator), and can go stale the day after it is written. It is a separate input/report shape from schema/audit-report.schema.json and is never merged into it or into the L1-L4 attestation ladder (docs/attestation-levels.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "dapp_name", "answered_at", "data_sources", "listings", "admin_powers", "operational_response"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
+
+    "dapp_name": { "type": "string", "minLength": 1, "description": "the dapp this questionnaire is about, not the kit" },
+
+    "answered_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "ISO date (UTC) these answers were true. This is the freshness marker (docs/DAPP-SCOPE-EXTENSION.md §4): organizational facts go stale the day a listing is added or an admin key rotates, and the kit cannot detect that on its own."
+    },
+
+    "answered_by_role": {
+      "type": "string",
+      "description": "a role or process (e.g. 'protocol ops lead', 'on-call rotation') that answered this — never a person's name."
+    },
+
+    "notes": { "type": "string" },
+
+    "data_sources": { "$ref": "#/$defs/data_sources_surface" },
+    "listings": { "$ref": "#/$defs/listings_surface" },
+    "admin_powers": { "$ref": "#/$defs/admin_powers_surface" },
+    "operational_response": { "$ref": "#/$defs/operational_response_surface" }
+  },
+
+  "$defs": {
+    "max_loss": {
+      "type": "object",
+      "description": "The §3 cross-cutting question, attached per listed input: if THIS input, and only this one, takes its worst possible value, what's the loss cap? 'No bound exists' is itself the finding — it is never left blank.",
+      "additionalProperties": false,
+      "required": ["bounded", "rationale"],
+      "properties": {
+        "bounded": { "type": "boolean", "description": "true only if a concrete cap exists AND is enforced today, not merely planned" },
+        "bound_description": { "type": "string", "description": "required when bounded=true: the actual cap and what enforces it — a vault balance, a rate limit, a pause latency" },
+        "rationale": { "type": "string", "minLength": 1, "description": "why bounded, or why not. Required either way — 'unbounded' with no rationale is a worse answer than a stated one." }
+      },
+      "if": { "properties": { "bounded": { "const": true } } },
+      "then": { "required": ["bound_description"] }
+    },
+
+    "data_source_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "trust_model", "sanity_bound_exists", "max_loss"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "trust_model": {
+          "enum": ["single_oracle", "median_of_n", "twap", "operator_signed_message", "other"],
+          "description": "the SOURCE's own trust model, not whether the consuming code validates it"
+        },
+        "trust_model_detail": { "type": "string" },
+        "sanity_bound_exists": {
+          "type": "boolean",
+          "description": "is there a max single-block delta / floor / ceiling in the CONSUMING blueprint's own code — not in the source"
+        },
+        "sanity_bound_description": { "type": "string" },
+        "max_loss": { "$ref": "#/$defs/max_loss" }
+      }
+    },
+
+    "listing_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_or_pair", "add_process_attributable", "reruns_original_checks", "max_loss"],
+      "properties": {
+        "asset_or_pair": { "type": "string", "minLength": 1 },
+        "added_by": { "type": "string", "description": "the role or process that can add/remove this listing" },
+        "add_process_attributable": {
+          "type": "boolean",
+          "description": "is adding/removing this listing logged and attributable on-chain, or only in an admin panel's own database"
+        },
+        "reruns_original_checks": {
+          "type": "boolean",
+          "description": "does adding this listing re-run the checks the original listing set had (decimal places, divisor-by-zero exposure, price-source trust), or is it assumed safe by precedent"
+        },
+        "decimals_assumption_note": { "type": "string", "description": "e.g. a formula that assumes 18-decimal resources, silently wrong for a 6-decimal stablecoin" },
+        "max_loss": { "$ref": "#/$defs/max_loss" }
+      }
+    },
+
+    "admin_power_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability", "holder", "single_signature_sufficient", "max_loss"],
+      "properties": {
+        "capability": { "type": "string", "minLength": 1, "description": "e.g. 'pause withdrawals', 'rotate owner badge', 'change fee parameters'" },
+        "holder": { "enum": ["on_chain_badge", "off_chain_signer", "both"] },
+        "single_signature_sufficient": {
+          "type": "boolean",
+          "description": "is this action a single signature with no timelock or multisig"
+        },
+        "accepted_risk_justification": {
+          "type": "string",
+          "description": "required when single_signature_sufficient=true: a documented, accepted-risk reason — not silence standing in for an oversight"
+        },
+        "off_chain_holder_scope": {
+          "enum": ["none", "narrow_allowlisted", "full_badge_power", "unknown"],
+          "description": "if a keeper/bot/cron process holds or can obtain this power, is its scope narrower than the on-chain badge's full power"
+        },
+        "max_loss": { "$ref": "#/$defs/max_loss" }
+      },
+      "if": { "properties": { "single_signature_sufficient": { "const": true } } },
+      "then": { "required": ["accepted_risk_justification"] }
+    },
+
+    "data_sources_surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicable"],
+      "properties": {
+        "applicable": { "type": "boolean" },
+        "justification": { "type": "string" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/data_source_item" } }
+      },
+      "if": { "properties": { "applicable": { "const": false } } },
+      "then": { "required": ["justification"] },
+      "else": { "required": ["items"], "properties": { "items": { "minItems": 1 } } }
+    },
+
+    "listings_surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicable"],
+      "properties": {
+        "applicable": { "type": "boolean" },
+        "justification": { "type": "string" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/listing_item" } }
+      },
+      "if": { "properties": { "applicable": { "const": false } } },
+      "then": { "required": ["justification"] },
+      "else": { "required": ["items"], "properties": { "items": { "minItems": 1 } } }
+    },
+
+    "admin_powers_surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicable"],
+      "properties": {
+        "applicable": { "type": "boolean" },
+        "justification": { "type": "string" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/admin_power_item" } }
+      },
+      "if": { "properties": { "applicable": { "const": false } } },
+      "then": { "required": ["justification"] },
+      "else": { "required": ["items"], "properties": { "items": { "minItems": 1 } } }
+    },
+
+    "operational_response_surface": {
+      "type": "object",
+      "description": "§2.4. Not a list of trusted inputs like the other three surfaces, so it carries no per-item max_loss — it's the mitigation, not the thing being bounded.",
+      "additionalProperties": false,
+      "required": ["applicable"],
+      "properties": {
+        "applicable": { "type": "boolean" },
+        "justification": { "type": "string" },
+        "pause_path_exists": { "type": "boolean" },
+        "pause_who_can_trigger": { "type": "string" },
+        "pause_exercised_outside_test": { "type": "boolean", "description": "has the pause/halt path ever actually been exercised outside a test" },
+        "monitoring_exists": { "type": "boolean" },
+        "monitoring_covers": {
+          "type": "array",
+          "items": { "enum": ["data_sources", "listings", "admin_powers"] },
+          "uniqueItems": true
+        },
+        "monitoring_description": { "type": "string" },
+        "escalation_defined": { "type": "boolean" },
+        "escalation_description": { "type": "string" },
+        "fastest_lever": {
+          "enum": ["pause", "redeploy", "governance_vote", "none", "other"],
+          "description": "what can actually be done without a human audit or a governance vote first"
+        }
+      },
+      "if": { "properties": { "applicable": { "const": false } } },
+      "then": { "required": ["justification"] },
+      "else": { "required": ["pause_path_exists", "monitoring_exists", "escalation_defined", "fastest_lever"] }
+    }
+  }
+}

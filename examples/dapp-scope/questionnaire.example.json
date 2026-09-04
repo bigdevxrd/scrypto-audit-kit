@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0",
+  "dapp_name": "example-lending-vault",
+  "answered_at": "2026-09-04",
+  "answered_by_role": "protocol ops lead",
+  "notes": "Illustrative fixture for the dapp-scope pass. Not a real deployment — see docs/DAPP-SCOPE-EXTENSION.md for what each field is asking and why.",
+
+  "data_sources": {
+    "applicable": true,
+    "items": [
+      {
+        "name": "XRD/USD price feed (single relayer)",
+        "trust_model": "single_oracle",
+        "trust_model_detail": "one off-chain relayer signs a price message; no fallback source",
+        "sanity_bound_exists": false,
+        "max_loss": {
+          "bounded": false,
+          "rationale": "no floor/ceiling or max single-block delta check in the consuming blueprint — a stale or wrong-by-orders-of-magnitude price is fully inherited, capped only by the vault's total deposits"
+        }
+      },
+      {
+        "name": "component TVL read (own state)",
+        "trust_model": "other",
+        "trust_model_detail": "read from this component's own vault balances, not an external source",
+        "sanity_bound_exists": true,
+        "sanity_bound_description": "value is read directly from Radix-enforced vault state; cannot be manipulated by an external write",
+        "max_loss": {
+          "bounded": true,
+          "bound_description": "not externally influenceable, so worst case is zero incremental loss from this input",
+          "rationale": "this is the blueprint's own custodied state, not an external input the system merely trusts"
+        }
+      }
+    ]
+  },
+
+  "listings": {
+    "applicable": true,
+    "items": [
+      {
+        "asset_or_pair": "xUSDC collateral",
+        "added_by": "governance multisig (3-of-5)",
+        "add_process_attributable": true,
+        "reruns_original_checks": true,
+        "decimals_assumption_note": "formula assumes 6-decimal stablecoins for this listing class; a future 18-decimal addition would need the divisor path re-reviewed",
+        "max_loss": {
+          "bounded": true,
+          "bound_description": "capped at this listing's own supply ceiling, enforced by the collateral factor check on mint",
+          "rationale": "governance-gated, logged on-chain, and the original checklist re-runs on every addition"
+        }
+      }
+    ]
+  },
+
+  "admin_powers": {
+    "applicable": true,
+    "items": [
+      {
+        "capability": "pause new borrows",
+        "holder": "on_chain_badge",
+        "single_signature_sufficient": true,
+        "accepted_risk_justification": "pausing is a fail-safe action (reduces exposure, never increases it), so a single-signer fast path is an accepted trade-off distinct from anything that moves funds",
+        "off_chain_holder_scope": "none",
+        "max_loss": {
+          "bounded": true,
+          "bound_description": "pausing borrows cannot itself extract value; worst case is a missed borrow, not a loss",
+          "rationale": "the action only restricts future calls, it does not move or reprice existing custodied assets"
+        }
+      },
+      {
+        "capability": "rotate owner badge",
+        "holder": "on_chain_badge",
+        "single_signature_sufficient": true,
+        "accepted_risk_justification": "no timelock has been implemented yet; this is a known gap, not a considered trade-off",
+        "off_chain_holder_scope": "unknown",
+        "max_loss": {
+          "bounded": false,
+          "rationale": "a rotated owner badge inherits every other privileged capability in this list with no timelock or multisig gate, so the loss cap on this input is the loss cap of the whole system"
+        }
+      }
+    ]
+  },
+
+  "operational_response": {
+    "applicable": true,
+    "pause_path_exists": true,
+    "pause_who_can_trigger": "the on-chain owner badge (see admin_powers)",
+    "pause_exercised_outside_test": false,
+    "monitoring_exists": true,
+    "monitoring_covers": ["data_sources"],
+    "monitoring_description": "an off-chain watcher alerts if the price feed moves more than 20% between polls; nothing watches listing changes or admin actions yet",
+    "escalation_defined": true,
+    "escalation_description": "on-call rotation is paged; can trigger the pause badge without a governance vote",
+    "fastest_lever": "pause"
+  }
+}

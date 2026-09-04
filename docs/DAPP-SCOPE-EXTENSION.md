@@ -1,9 +1,14 @@
 # Scoping the kit to a dapp, not just a blueprint — a proposal
 
 **Date:** 2026-09-03
-**Status:** Proposal. No code. Filed alongside the hardening triage in
+**Status:** First slice shipped in PR #25 — `prompts/dapp-scope-checklist.md`, the
+questionnaire schema (`schema/dapp-scope-questionnaire.schema.json`) with a worked example, and a
+deterministic `sak-dapp-scope` CLI (validate → render, "unbounded" is a finding per §3). Built
+exactly to the §5 shape below and nothing more: not wired into `prompts/checklist.md`,
+`schema/audit-report.schema.json`, the MCP tools, or the L1–L4 attestation ladder. Originally
+filed alongside the hardening triage in
 [HARDENING-TRIAGE-2026-09-03.md](HARDENING-TRIAGE-2026-09-03.md) as part of "harden before
-announcing" — this document is the design the announcement's tracking issue should link to.
+announcing" — this document remains the design any further work here should follow.
 **Relationship to the trust ladder:** [architecture.md](architecture.md) frames the kit as owning
 the middle rungs between "it compiles" and "a human audited it." Everything on that ladder today
 audits **one Scrypto package** — `Cargo.toml` + `src/` + `tests/`. This proposal is about the rung

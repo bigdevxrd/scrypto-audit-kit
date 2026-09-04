@@ -86,6 +86,7 @@ sak-gen-tests = "scrypto_audit_kit.gen_tests:main"
 sak-attest = "scrypto_audit_kit.attest:main"
 sak-gate = "scrypto_audit_kit.ci_gate:main"
 sak-mcp = "scrypto_audit_kit.mcp_server:main"
+sak-dapp-scope = "scrypto_audit_kit.dapp_scope:main"
 
 # The existing bin/ directory IS the package — no files move, so the bare-clone run
 # paths (audit.sh, the tests, .mcp.json) are untouched.
