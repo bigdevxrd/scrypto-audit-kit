@@ -1,0 +1,63 @@
+# Audit reports — generated outputs, not source of truth
+audit-reports/*
+!audit-reports/.gitkeep
+
+# Aider session artifacts
+.aider*
+!.aiderignore
+!.aider.conf.yml
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Secrets — should never be in this repo, but defense in depth
+.env
+.env.*
+# ...but the template IS tracked, so users know what to set:
+!.env.example
+*.key
+*.pem
+
+# Rust artifacts — only present if someone runs cargo here for some reason
+target/
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# Python packaging build artifacts (pip install / build leaves these in-tree)
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+
+# Claude agent local state (machine-local, never shared). settings.local.json can carry
+# permission overrides for this machine — committing it would hand them to everyone.
+# The tracked skill under .claude/skills/ is deliberately not matched here.
+.claude/worktrees/
+.claude/settings.local.json
+
+# Retired docs kept on this machine only
+.local-archive/
+
+# Full-detail posture-scanner output -- every entity's real reason/evidence, embargoed or
+# not, and every third-party entity's real findings. scanner/results/ (tracked, above) is the
+# public directory and receives only the gated report from scanner.site.redact_for_publication;
+# this is where the unredacted scan a run also writes goes instead. See scanner/cli.py.
+scanner/results-full/
+
+# Full-detail cohort -- may name real third-party projects and addresses, and cohort notes
+# describing them, none of which belong in a public repo (scanner/data/cohort.json, tracked
+# above, is the public cohort: the operator's own entities only). scanner.cli's cmd_scan reads
+# this file instead of the public one when it exists, and never lets a published report's
+# cohort_source name it. See scanner/cli.py's DEFAULT_FULL_COHORT_PATH.
+scanner/data/cohort-full.json
+
+# Out-of-band targets for tests/test_no_forbidden_strings.py: private identifiers that must never
+# be published, so they cannot be listed in a public repo. Local only; see that file's header.
+tests/.forbidden-tokens.local

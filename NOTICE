@@ -1,0 +1,28 @@
+scrypto-audit-kit — a pre-audit toolkit for Scrypto blueprints on Radix
+Copyright 2026 bigdev (https://github.com/bigdevxrd)
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE). The licence
+covers every file in this repository, including the Python toolkit and MCP server (bin/), the
+on-chain attestation registry blueprint (attestation/), the posture scanner (scanner/) and the
+deliberately vulnerable example package (examples/vulnerable-vault), which exists only as a
+test fixture and must not be deployed or copied.
+
+Contributions. All contributions to date were made by the copyright holder above or by
+automated tooling operated by the copyright holder (dependency-update commits from
+dependabot[bot] are that tooling, not third-party contributors).
+
+Third-party material. The files under references/ are the maintainer's notes on patterns found
+in publicly available Radix codebases, each citing its source and licence in its own header;
+they summarise those codebases and do not relicense them. The upstream projects keep their own
+licences:
+
+- radixdlt/Ignition (https://github.com/radixdlt/Ignition) — Apache-2.0.
+- caviarnine/caviarnine-scrypto (https://github.com/caviarnine/caviarnine-scrypto) — Apache-2.0.
+- InfluxionLabs/anthic-sdk (https://github.com/InfluxionLabs/anthic-sdk) — open source; see that
+  repository for its licence. references/subintents-patterns.md summarises it.
+- The Radix documentation on subintents (https://docs.radixdlt.com/docs/subintents) — CC-BY, as
+  that file's header states; references/subintents-patterns.md summarises it with attribution.
+
+The Scrypto crates this repository's blueprints build against (scrypto, sbor, radix-*) are
+published by Radix under its own "Radix License, v1.0", not an SPDX licence. See those crates'
+licence files.

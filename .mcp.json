@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "scrypto-audit-kit": {
+      "command": "python3",
+      "args": ["${CLAUDE_PROJECT_DIR}/bin/mcp_server.py"],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY:-}"
+      }
+    }
+  }
+}

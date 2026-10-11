@@ -1,0 +1,174 @@
+# Reusable pre-audit workflow. Call it from your Scrypto repo — see
+# examples/ci/pre-audit.yml for a copy-paste caller and docs/ci.md for the badge.
+name: pre-audit
+
+on:
+  workflow_call:
+    inputs:
+      package:
+        description: "Path to the Scrypto package to audit (dir with Cargo.toml + src/lib.rs)."
+        required: true
+        type: string
+      model:
+        description: "claude — the only value CI can authenticate, and now the only accepted one. deepseek | both are aider cross-model modes needing a DEEPSEEK_API_KEY this workflow never forwards; they are rejected up front with an explanation rather than failing mid-audit. They work locally (docs/backends.md)."
+        required: false
+        default: claude
+        type: string
+      fail-on:
+        description: "Highest severity allowed before the build fails: none | low | medium | high | critical."
+        required: false
+        default: high
+        type: string
+      sign-provenance:
+        description: "Sign the report's provenance with GitHub's OIDC identity (actions/attest-build-provenance). This is what earns rung L2: a reader can verify an independent runner produced the report, not the claimant. Off by default — it writes an attestation against YOUR repo and needs `attestations: write`, which a reusable workflow cannot grant itself. To enable, set this true AND add `permissions: { attestations: write, id-token: write, contents: read }` to your calling job."
+        required: false
+        default: false
+        type: boolean
+      kit-ref:
+        description: "scrypto-audit-kit ref to pin (tag/branch/sha). Defaults to main — pin it to the same release as the `uses:` ref, or the audit code moves under you. Floor is v0.8.1, matching the `uses:` ref: v0.7.0 and earlier ship a static analyzer that exits 0 on a package path it never read (a green build for an unscanned package), v0.6.0 defaults to the claude-api backend and v0.5.0 has no [llm] extra at all, so on either the backend install step below fails the job rather than letting it die mid-audit."
+        required: false
+        default: main
+        type: string
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: true
+
+jobs:
+  pre-audit:
+    runs-on: ubuntu-latest
+    # The job reads untrusted code and calls a paid API. Cap the blast radius of a package that
+    # tries to burn the caller's runner minutes (or API budget) by hanging the audit.
+    timeout-minutes: 30
+    # Least privilege: a reusable workflow inherits the CALLER's token scope, so hard-cap it
+    # here — the audit only reads code. (It can only downgrade the caller, never widen it.)
+    #
+    # id-token/attestations are needed ONLY by the optional provenance-signing step. Listing them
+    # here does not grant them: the caller's job must also grant them, or the token simply does
+    # not carry them and the signing step fails while everything above it still runs.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Validate inputs
+        # `deepseek` and `both` are aider cross-model modes needing a DEEPSEEK_API_KEY that this
+        # workflow does not accept and never forwards — they CANNOT authenticate here. They used
+        # to install aider and then fail deep inside the audit with an auth error that looks like
+        # a kit bug. Reject them here, where the message can say why. (Traced before removing the
+        # aider install: neither the env: block nor audit.sh's .env fallback can supply that key
+        # in this job, so there is no path where these modes work.)
+        env:
+          MODEL: ${{ inputs.model }}
+        run: |
+          case "$MODEL" in
+            claude) ;;
+            deepseek|both)
+              echo "::error::model '$MODEL' cannot run in CI: it is an aider cross-model mode that"
+              echo "needs a DEEPSEEK_API_KEY, and this workflow accepts no such secret. Use"
+              echo "model: claude in CI; the cross-model modes work locally (docs/backends.md)."
+              exit 1 ;;
+            *)
+              echo "::error::unknown model '$MODEL' — expected 'claude'."
+              exit 1 ;;
+          esac
+
+      - name: Check out the project under audit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Land the untrusted tree in a subdirectory, NOT at $GITHUB_WORKSPACE. The workspace
+          # root is the default cwd of every `run:` step, and CPython puts the cwd on sys.path
+          # for `python3 -c` — so with the audited code at the root, any `python3 -c 'import X'`
+          # in this job imports an attacker-supplied X.py from the package under audit. Keeping
+          # the root ours removes that whole class rather than patching it call site by call
+          # site. The audit step below resolves the caller's `package` inside this directory.
+          path: target
+          # The audit reads this (untrusted) tree, it does not build it: audit.sh's compile
+          # check is opt-in and this workflow never passes --compile-check. Drop the token
+          # regardless — nothing downstream needs it, and it keeps the GITHUB_TOKEN out of
+          # .git/config where a build script could read it if a run ever does compile.
+          persist-credentials: false
+
+      - name: Check out scrypto-audit-kit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: bigdevxrd/scrypto-audit-kit
+          # Caller-controlled, but this is an action input, not a run script: the runner hands
+          # the value to checkout's JS, which execs git with an argv array — no shell parses
+          # it, so unlike the run: steps below it needs no env binding.
+          ref: ${{ inputs.kit-ref }}
+          path: .scrypto-audit-kit
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install the audit backend
+        # audit.sh defaults to the claude-api backend, which imports `anthropic`
+        # (bin/llm_audit.py). Its pre-flight only checks that python3 exists, so a missing
+        # `anthropic` gets past it and the job dies mid-run at the import — install the kit's
+        # [llm] extra here so the default path actually runs.
+        env:
+          KIT_REF: ${{ inputs.kit-ref }}
+        run: |
+          pip install "./.scrypto-audit-kit[llm]"
+          # The extra only exists from v0.6.0 on. Against an older kit-ref pip does NOT fail —
+          # it prints "WARNING: scrypto-audit-kit X does not provide the extra 'llm'", installs
+          # without `anthropic`, and exits 0. Assert the import here, where the message can name
+          # the cause, instead of letting the job go green and die later at llm_audit.py's import.
+          #
+          # -P (PEP 370 safe path, python >= 3.11; this job pins 3.12) keeps the cwd OFF
+          # sys.path. Belt and braces with the `path: target` checkout above: without either,
+          # an audited package shipping its own anthropic.py both executes here — one step
+          # before ANTHROPIC_API_KEY enters the job — and satisfies the probe, so the guard
+          # passes while the payload runs. Never drop the -P.
+          if ! python3 -P -c 'import anthropic' 2>/dev/null; then
+            echo "::error::the claude-api backend needs the 'anthropic' package and it is not installed."
+            echo "kit-ref '$KIT_REF' has no [llm] extra (added in v0.6.0), so pip only warned and skipped it."
+            echo "Pin kit-ref to v0.8.1 or later, or install anthropic yourself before this workflow runs."
+            exit 1
+          fi
+
+      - name: Run pre-audit
+        # Bind the caller's inputs to env vars and quote the variables — never interpolate
+        # ${{ inputs.* }} into a run script (GitHub substitutes the value before bash sees the
+        # line, so a crafted input executes in this job, which has ANTHROPIC_API_KEY in env).
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODEL: ${{ inputs.model }}
+          # `package` stays caller-relative (a path inside THEIR repo); the checkout now lands
+          # under target/, so resolve it there. audit.sh derives the report name from the
+          # package basename and its parent, both unchanged by the extra level.
+          PACKAGE: target/${{ inputs.package }}
+        run: .scrypto-audit-kit/audit.sh --model "$MODEL" "$PACKAGE"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pre-audit-report
+          path: .scrypto-audit-kit/audit-reports/*
+          if-no-files-found: warn
+
+      - name: Gate on severity
+        # Same rule as the audit step: the input goes through env, never into the run line.
+        env:
+          FAIL_ON: ${{ inputs.fail-on }}
+        run: python3 .scrypto-audit-kit/bin/ci-gate.py --reports .scrypto-audit-kit/audit-reports --fail-on "$FAIL_ON"
+
+      - name: Sign the report's provenance
+        # THIS is what makes a run L2 rather than L1-with-an-audit-trail. Everything above proves
+        # only that a report exists; the rung is about WHO WITNESSED the run, and a claimant
+        # cannot witness themselves (docs/attestation-levels.md).
+        #
+        # attest-build-provenance has the build platform sign a statement binding this artifact
+        # to this workflow, repo, and commit, via OIDC — so a reader verifies it against GitHub's
+        # identity rather than against the author's word. `gh attestation verify` checks it.
+        #
+        # Runs on success only: a signed statement for a report that failed its own gate would be
+        # a signature attesting to a run the caller already rejected. Opt-out because it writes an
+        # attestation against the CALLER's repo, and not every caller wants that.
+        if: success() && inputs.sign-provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: .scrypto-audit-kit/audit-reports/*.json

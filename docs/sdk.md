@@ -1,0 +1,167 @@
+# Python SDK — build on the kit
+
+`pip install scrypto-audit-kit` gives you the kit's **deterministic core** as an importable
+library and as `sak-*` commands — this is what an agent developer builds on. The full LLM
+audit (`audit.sh`) runs from a clone through an LLM [backend](backends.md) (the Anthropic API
+by default) and needs an API key, but everything below runs straight from the pip package with
+no key and no toolchain.
+
+```bash
+pip install scrypto-audit-kit            # core (stdlib only, zero deps)
+pip install "scrypto-audit-kit[mcp]"     # + the MCP server
+pip install "scrypto-audit-kit[schema]"  # + jsonschema validation
+pip install "scrypto-audit-kit[llm]"     # + the default claude-api audit backend (anthropic)
+```
+
+The core needs **Python 3.9+**. The `[mcp]` extra needs **3.10+** — that is the MCP SDK's own
+floor, not ours; on 3.9 the extra installs nothing rather than failing, so the core still
+works and only the MCP server is unavailable.
+
+```python
+import scrypto_audit_kit as sak
+print(sak.__version__)
+from scrypto_audit_kit import static_analysis, sak_lib, attest, gen_tests
+```
+
+Importing the package is **side-effect free** — it does not touch `sys.path`, so it cannot shadow
+a module of your own. (Up to and including v0.7.0 it did: a module in your application named
+`attest`, `sak_lib`, `static_analysis`, `gen_tests`, `llm_audit`, `mcp_server` or `ci_gate` was
+silently redirected to the kit's for the rest of the process. Fixed in v0.8.0 —
+tracked in the maintainer's issue list.)
+
+(Running from a clone without installing? Every [example agent](../examples/agents/) falls back
+to `../../bin` automatically — the same import shim works in your own scripts.)
+
+## What runs where
+
+| Capability | Module / function | Needs a key? | Needs a clone? |
+|---|---|---|---|
+| Static analysis | `static_analysis.analyze_package` | no | no |
+| Severity gate, diff, merge | `sak_lib` | no | no |
+| Test-scaffold generation | `gen_tests.propose_tests` | no | no |
+| Attestation payload + manifest | `attest.build_payload` / `render_manifest` | no | no |
+| The cheap MCP tools | `mcp_server.*` | no | no |
+| Full LLM pre-audit | `mcp_server.audit_package` / `audit.sh` | **yes** | **yes** |
+| The checklist text | `mcp_server.get_checklist` | no | clone or `SAK_HOME` |
+
+> The LLM-backed tools shell out to `audit.sh`, which dispatches to the selected
+> [backend](backends.md) (claude-api by default). Run them from a clone, or set `SAK_HOME` to a
+> clone so the installed server can find the harness + prompts.
+
+## The deterministic core
+
+### static_analysis — the free rules
+
+```python
+from scrypto_audit_kit import static_analysis, sak_lib
+
+findings = static_analysis.analyze_package("path/to/package")   # schema-shaped findings
+print(sak_lib.severity_counts(findings))                        # {'medium': 5}
+for f in findings:
+    print(f["id"], f["severity"], f["location"], "—", f["title"])
+```
+
+`analyze_package(pkg_dir)` walks `<pkg>/src/**.rs`, runs the [15 rules](static-analysis.md)
+(v0.8.0 shipped 14; the 15th arrived in v0.8.1) over a comment/string-aware view, and returns findings with `S-###` ids and `source:"static"`.
+Lower-level: `analyze_text(rel_path, src)` (one file) and
+`strip_comments_and_strings(src, keep_strings=False, keep_comments=False)`.
+
+### sak_lib — reports, gates, diffs
+
+Pure, stdlib-only helpers over a report dict (or a findings list):
+
+```python
+from scrypto_audit_kit import sak_lib
+
+report  = sak_lib.build_report(findings, "path/to/package")  # schema-valid + provenance-stamped
+verdict = sak_lib.gate_verdict(report, fail_on="high")  # {passed, worst, counts, total, fail_on}
+
+base = sak_lib.load_report("baseline.json")
+cur  = sak_lib.load_report("after-fix.json")
+diff = sak_lib.diff_reports(base, cur)                  # {fixed, still_open, new}
+
+span = sak_lib.read_source_span("path/to/package", "src/lib.rs:42")   # verify a citation
+```
+
+Also `filter_findings`, `counts_summary`, `worst_severity`, `finding_signature`,
+`merge_findings`, `find_reports`, `newest_report`, `render_findings_md`. Severities rank
+`info < low < medium < high < critical`; an unknown or blank severity is treated as *above*
+critical, so it can never silently slip a gate.
+
+### gen_tests — property-test scaffolds
+
+```python
+from pathlib import Path
+from scrypto_audit_kit import gen_tests
+
+out = gen_tests.propose_tests("path/to/package")
+print(out["count"], "scaffolds for", out["blueprint"])
+Path("tests/generated.rs").write_text(out["rust"])      # compilable, #[ignore]d
+```
+
+Reads the blueprint's `enable_method_auth!` surface and vault fields, then proposes auth
+negative-path, happy-path, and value-conservation scaffolds. The kit never writes them into
+your package — you do, then remove the `#[ignore]` and fill in each `todo!()`.
+
+### attest — the on-chain bridge
+
+```python
+from scrypto_audit_kit import attest
+
+payload  = attest.build_payload("report.json")      # hashes + counts + the mode that ran
+manifest = attest.render_manifest(payload, component="component_rdx1...", account="account_rdx1...")
+```
+
+`build_payload` computes the hashes, severity counts, and `mode` (`static` | `llm` | `hybrid`);
+`render_manifest` renders the Radix transaction manifest. See
+[the attestation blueprint](../attestation/).
+
+Two things worth knowing:
+
+- **`mode` is a fact, not a trust level.** It says what analysis ran. The L1/L2/L3 rung is yours
+  to compute from mode + who attested + `issuer_verified` — the rule is published in
+  [attestation-levels.md](attestation-levels.md). No level is recorded on-chain.
+- **It refuses rather than guessing.** `build_payload` raises `attest.AttestationError` if the
+  report has no `source_hash` anchor or no `kit.version`. Pass the package dir to `build_report`
+  (above) and the anchor is stamped for you; without it there is nothing for an attestation to
+  bind to, and the on-chain call would revert *after* locking your fee.
+
+## The 9 tools, in-process
+
+The MCP tool functions are plain Python — call them directly, no server needed:
+
+```python
+from scrypto_audit_kit import mcp_server as tools
+
+tools.static_scan("path/to/package")                 # {count, counts, findings}
+tools.gate("report.json", fail_on="high")            # {passed, worst, ...}
+tools.show_finding_source("report.json", "S-001", "path/to/package")
+tools.attestation_payload("report.json")             # {payload, manifest?}
+tools.audit_package("path/to/package")               # full hybrid run — needs a key + clone
+```
+
+Formal input/output contracts: [schema/mcp-tools.schema.json](../schema/mcp-tools.schema.json),
+documented in [mcp-tools.md](mcp-tools.md). The same functions are served over MCP by
+`bin/mcp_server.py`, so an agent can call them in-process *or* over the protocol — identical
+shapes.
+
+## Console scripts
+
+`pip install` puts these on your `PATH`:
+
+| Command | Wraps | Does |
+|---|---|---|
+| `sak-static <pkg>` | `static_analysis` | print static findings as JSON |
+| `sak-gate --reports <path> --fail-on high` | `ci_gate` | exit non-zero past a threshold (CI) |
+| `sak-gen-tests <pkg>` | `gen_tests` | print the test scaffolds |
+| `sak-attest <report.json>` | `attest` | print the payload / manifest |
+| `sak-mcp` | `mcp_server` | run the MCP server (stdio) |
+
+## Worked examples
+
+[`examples/agents/`](../examples/agents/) has three runnable programs — a free-tier CI gate, the
+full audit → fix → verify loop, and an MCP client — each working against the bundled fixture.
+Start from the one closest to what you're building.
+
+> Whatever you build, keep the kit's contract with the user: report what was checked and what's
+> residual; never decide their code is safe.

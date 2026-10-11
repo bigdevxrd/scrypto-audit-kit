@@ -1,0 +1,239 @@
+{
+  "ledger_state": {
+    "network": "mainnet",
+    "state_version": 557840622,
+    "proposer_round_timestamp": "2026-08-31T21:19:06.179Z",
+    "epoch": 339896,
+    "round": 102
+  },
+  "items": [
+    {
+      "address": "account_rdx12yh4fwevmvnqgd3ppzau66cm9xu874srmrt9g2cye3fa8j8y78z9sq",
+      "metadata": {
+        "total_count": 7,
+        "items": [
+          {
+            "key": "claimed_entities",
+            "value": {
+              "typed": {
+                "values": [
+                  "component_rdx1cqlakjp65k8zkznynynsqpjcu7fwt9zcdvee358p948wp9h4n2km99",
+                  "component_rdx1cqu2vkyhwrg6hygj8t0tveywg6qree9g3thxpfx637kshkur785gdd",
+                  "package_rdx1ph03wnq9x4q9z9ufc2anrrmeeu03fu92uk9wkyr8fg50rdgxut2wtd"
+                ],
+                "type": "GlobalAddressArray"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 538020840,
+            "_fixture_note": "trimmed from 3 real entries to 3 for fixture size; membership of must_keep addresses preserved exactly as verified live"
+          },
+          {
+            "key": "account_type",
+            "value": {
+              "typed": {
+                "value": "dapp definition",
+                "type": "String"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 483073764
+          },
+          {
+            "key": "description",
+            "value": {
+              "typed": {
+                "value": "Community governance infrastructure for Radix",
+                "type": "String"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 483073764
+          },
+          {
+            "key": "name",
+            "value": {
+              "typed": {
+                "value": "Radix Guild",
+                "type": "String"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 483073764
+          },
+          {
+            "key": "claimed_websites",
+            "value": {
+              "typed": {
+                "values": [
+                  "https://radixguild.com"
+                ],
+                "type": "OriginArray"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 538020840
+          },
+          {
+            "key": "owner_keys",
+            "value": {
+              "typed": {
+                "values": [
+                  {
+                    "hash_hex": "2f54bb2cdb2604362108bbcd6b1b29b87f5603d8d6542b04cc53d3c8e4",
+                    "key_hash_type": "EddsaEd25519"
+                  }
+                ],
+                "type": "PublicKeyHashArray"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 483060243
+          },
+          {
+            "key": "owner_badge",
+            "value": {
+              "typed": {
+                "value": "[512f54bb2cdb2604362108bbcd6b1b29b87f5603d8d6542b04cc53d3c8e4]",
+                "type": "NonFungibleLocalId"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 483060243
+          }
+        ]
+      },
+      "details": {
+        "package_address": "package_rdx1pkgxxxxxxxxxaccntxxxxxxxxxx000929625493xxxxxxxxxaccntx",
+        "blueprint_name": "Account",
+        "blueprint_version": "1.0.0",
+        "state": {
+          "default_deposit_rule": "Accept"
+        },
+        "role_assignments": {
+          "owner": {
+            "rule": {
+              "type": "Protected",
+              "access_rule": {
+                "type": "ProofRule",
+                "proof_rule": {
+                  "type": "Require",
+                  "requirement": {
+                    "type": "NonFungible",
+                    "non_fungible": {
+                      "local_id": {
+                        "id_type": "Bytes",
+                        "sbor_hex": "5cc0021d2f54bb2cdb2604362108bbcd6b1b29b87f5603d8d6542b04cc53d3c8e4",
+                        "simple_rep": "[2f54bb2cdb2604362108bbcd6b1b29b87f5603d8d6542b04cc53d3c8e4]"
+                      },
+                      "resource_address": "resource_rdx1nfxxxxxxxxxxed25sgxxxxxxxxx002236757237xxxxxxxxxed25sg"
+                    }
+                  }
+                }
+              }
+            },
+            "updater": "Object"
+          },
+          "entries": [
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "securify"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "Protected",
+                  "access_rule": {
+                    "type": "ProofRule",
+                    "proof_rule": {
+                      "type": "Require",
+                      "requirement": {
+                        "type": "NonFungible",
+                        "non_fungible": {
+                          "local_id": {
+                            "id_type": "Bytes",
+                            "sbor_hex": "5cc0021d2f54bb2cdb2604362108bbcd6b1b29b87f5603d8d6542b04cc53d3c8e4",
+                            "simple_rep": "[2f54bb2cdb2604362108bbcd6b1b29b87f5603d8d6542b04cc53d3c8e4]"
+                          },
+                          "resource_address": "resource_rdx1nfxxxxxxxxxxed25sgxxxxxxxxx002236757237xxxxxxxxxed25sg"
+                        }
+                      }
+                    }
+                  }
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "_self_"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            }
+          ]
+        },
+        "type": "Component"
+      }
+    }
+  ]
+}

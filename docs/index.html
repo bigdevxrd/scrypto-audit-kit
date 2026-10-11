@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Radix posture scan</title>
+<meta name="description" content="A posture scan of the live Radix entities Radix Guild operates: what each one states about its own ownership, authority and upgrade path, read straight from the ledger.">
+<style>
+:root{
+  --paper:#F3F2EE;--surface:#FFFFFF;--sunk:#E8E7E1;
+  --ink:#16181C;--soft:#4C525A;--faint:#7E858D;
+  --rule:#D6D5CE;--rule-soft:#E6E5DF;
+  --accent:#2F5D50;--pass:#2C6E49;--fail:#A0332A;--info:#8A6A12;--na:#7E858D;
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#0F1113;--surface:#181B1F;--sunk:#0B0D0F;
+  --ink:#E8EAE7;--soft:#A6ADB4;--faint:#7B838B;
+  --rule:#2A2F35;--rule-soft:#1F2429;
+  --accent:#79B5A1;--pass:#6BC496;--fail:#EE8C7F;--info:#DDB25C;--na:#7B838B;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:36px 20px 72px;display:flex;flex-direction:column;gap:34px}
+h1{font-size:33px;line-height:1.06;letter-spacing:-.025em;margin:6px 0 0;text-wrap:balance}
+h2{font-size:19px;letter-spacing:-.012em;margin:0}
+h3{font-size:15.5px;margin:0}
+p{margin:0}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em;
+  background:var(--sunk);padding:1px 4px;border-radius:2px;word-break:break-all}
+.eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint)}
+.lede{color:var(--soft);max-width:64ch;margin-top:11px}
+.state{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px 24px;
+  background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--accent);
+  border-radius:2px;padding:18px 20px}
+.state.halted{border-left-color:var(--info)}
+.pin{background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--accent);
+  border-radius:2px;padding:14px 18px;color:var(--soft);font-size:13.5px}
+.pin p{max-width:80ch}
+.pin code{color:var(--ink)}
+.pin.halted{border-left-color:var(--info)}
+.datum{display:flex;flex-direction:column;gap:2px}
+.datum b{font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;
+  font-size:20px;letter-spacing:-.02em}
+.datum span{font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint)}
+.datum.src b{font-size:13px;font-weight:500;letter-spacing:0;color:var(--soft);
+  word-break:break-all;align-self:end;padding-bottom:3px}
+.state .note{grid-column:1/-1;border-top:1px solid var(--rule-soft);padding-top:12px;
+  color:var(--soft);font-size:13.5px;max-width:78ch}
+section{display:flex;flex-direction:column;gap:14px}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+  border-bottom:1px solid var(--rule);padding-bottom:7px}
+.sec-head .eyebrow{margin-left:auto}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--faint);font-weight:500;padding:0 12px 7px 0;
+  border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:11px 12px 11px 0;border-bottom:1px solid var(--rule-soft);color:var(--soft);
+  vertical-align:top}
+td.ent{min-width:230px}
+td.ent b{display:block;color:var(--ink);font-weight:600}
+td.ent code{background:none;padding:0;font-size:11px;color:var(--faint)}
+.pill{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;font-weight:700;
+  letter-spacing:.06em;padding:2px 6px;border-radius:2px;border:1px solid currentColor}
+.s-pass{color:var(--pass)}.s-fail{color:var(--fail)}
+.s-informational{color:var(--info)}.s-not_applicable{color:var(--na);border-color:var(--rule)}
+.s-embargoed{color:var(--info)}
+.legend{color:var(--soft);font-size:13px;max-width:78ch}
+.finding{background:var(--surface);border:1px solid var(--rule);border-radius:2px;
+  padding:15px 17px;display:flex;flex-direction:column;gap:9px}
+.finding .meta{color:var(--faint);font-size:12px}
+.finding ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px}
+.finding li{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--rule-soft);
+  padding-top:10px}
+.finding li:first-child{border-top:none;padding-top:0}
+.finding li p{color:var(--soft);font-size:13.5px;max-width:80ch}
+.finding li.held p{color:var(--info)}
+.sev{font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--faint);margin-left:auto}
+.finding li b{font-weight:600}
+.finding li>:first-child{margin-right:8px}
+.notes{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:9px;
+  color:var(--soft);font-size:13.5px}
+.notes li{max-width:80ch}
+footer{border-top:1px solid var(--rule);padding-top:14px;color:var(--faint);font-size:12.5px;
+  max-width:80ch}
+</style>
+</head><body>
+<main class="wrap">
+<header>
+<p class="eyebrow">Radix · posture scan</p>
+<h1>What the chain says about itself</h1>
+<p class="lede">Five checks, run against a fixed cohort of live entities, reading only what each one publishes on-ledger. This page covers only the entities Radix Guild operates itself, graded by the same rules as any other and not exempted from a failing result. Third-party projects are not listed, scored or named here.</p>
+</header>
+<section class="pin">
+<p>Pinned at state version <code>557,872,098</code> &mdash; ledger last advanced 2026-09-11 22:19 UTC. These results describe that pinned state, not the ledger as it is now; scans are run by hand and this page is not refreshed automatically.</p>
+</section>
+<section class="state live">
+<div class="datum"><b>2</b><span>Failing checks</span></div><div class="datum"><b>3</b><span>Entities published</span></div><div class="datum"><b>557872098</b><span>Ledger state</span></div><div class="datum src"><b>mainnet.radixdlt.com</b><span>Gateway</span></div>
+<p class="note">Failures by severity: 2 medium.</p>
+<p class="note own"><strong>2 of 3 published entities have a failing check: Guild Badge Manager, Guild Badge Factory.</strong> All are entities Radix Guild operates itself. They are published as found &mdash; not exempted, reclassified or hidden &mdash; and stay listed as failing until a later scan reads them differently.</p>
+</section>
+<section>
+<div class="sec-head"><h2>The cohort</h2><span class="eyebrow">Scan 20260911T221913Z-sv557872098 · mainnet · 2026-09-11T22:19:13Z</span></div>
+<div class="scroll"><table><thead><tr><th>Entity</th><th>Project</th>
+<th>dApp-def two-way</th>
+<th>Owner role</th>
+<th>Resource authority</th>
+<th>Upgrade</th>
+<th>Metadata</th>
+</tr></thead><tbody>
+<tr>
+<td class="ent"><b>Radix Guild dApp Definition account</b><code>account_rdx12y…78z9sq</code></td>
+<td>Radix Guild</td>
+<td><span class="pill s-pass">PASS</span></td>
+<td><span class="pill s-pass">PASS</span></td>
+<td><span class="pill s-not_applicable">n/a</span></td>
+<td><span class="pill s-not_applicable">n/a</span></td>
+<td><span class="pill s-pass">PASS</span></td>
+</tr>
+<tr>
+<td class="ent"><b>Guild Badge Manager</b><code>component_rdx1…tyrtva</code></td>
+<td>Radix Guild</td>
+<td><span class="pill s-fail">FAIL</span></td>
+<td><span class="pill s-informational">info</span></td>
+<td><span class="pill s-not_applicable">n/a</span></td>
+<td><span class="pill s-informational">info</span></td>
+<td><span class="pill s-informational">info</span></td>
+</tr>
+<tr>
+<td class="ent"><b>Guild Badge Factory</b><code>component_rdx1…n2km99</code></td>
+<td>Radix Guild</td>
+<td><span class="pill s-fail">FAIL</span></td>
+<td><span class="pill s-informational">info</span></td>
+<td><span class="pill s-not_applicable">n/a</span></td>
+<td><span class="pill s-informational">info</span></td>
+<td><span class="pill s-pass">PASS</span></td>
+</tr>
+</tbody></table></div>
+<p class="legend">Only <b>FAIL</b> carries weight. <b>info</b> marks a configuration whose correctness depends on the project&rsquo;s own intent &mdash; an ownerless AMM pool is both the correct permissionless design and, from chain data alone, indistinguishable from a missing recovery path, so the scanner refuses to call it a failure on a stranger&rsquo;s project. <b>n/a</b> means the check does not apply to that kind of entity.</p>
+</section>
+<section>
+<div class="sec-head"><h2>Findings</h2><span class="eyebrow">Every check, in full</span></div>
+<article class="finding">
+<h3>Radix Guild dApp Definition account</h3><p class="meta"><code>account_rdx12yh4fwevmvnqgd3ppzau66cm9xu874srmrt9g2cye3fa8j8y78z9sq</code> · account · Radix Guild</p>
+<ul>
+<li><span class="pill s-pass">PASS</span> <b>dApp-def two-way</b><span class="sev">none</span><p>Valid dApp Definition account: account_type is &#x27;dapp definition&#x27; and it claims 3 entities back. Each claiming entity&#x27;s own two-way status is evaluated at that entity&#x27;s own cohort row, not repeated here.</p></li>
+<li><span class="pill s-pass">PASS</span> <b>Owner role</b><span class="sev">none</span><p>Owner role is protected by a requirement AND rotatable (updater: Object) -- the badge holder (or the object&#x27;s own self-securify path) can repoint the owner rule if it is ever compromised.</p></li>
+<li><span class="pill s-not_applicable">n/a</span> <b>Resource authority</b><span class="sev">none</span><p>Not applicable: account entities carry no minter/burner/freezer/recaller role keys (those are resource-manager-specific).</p></li>
+<li><span class="pill s-not_applicable">n/a</span> <b>Upgrade</b><span class="sev">none</span><p>Not applicable: account entities carry no upgradable code.</p></li>
+<li><span class="pill s-pass">PASS</span> <b>Metadata</b><span class="sev">none</span><p>Metadata present and internally consistent: expected string fields are set, and any icon_url/info_url present is correctly typed as Url.</p></li>
+</ul></article>
+<article class="finding">
+<h3>Guild Badge Manager</h3><p class="meta"><code>component_rdx1czexylvvm0q4uhwpjaqmlznj9sd3y2jnmmah6qug9lm9sfm3tyrtva</code> · component · Radix Guild</p>
+<ul>
+<li><span class="pill s-fail">FAIL</span> <b>dApp-def two-way</b><span class="sev">medium</span><p>Does not name a dApp Definition at all (no &#x27;dapp_definition&#x27; or &#x27;dapp_definitions&#x27; metadata key), and is not listed by any dApp Definition account this scan knows about -- zero-sided, not just unverified.</p></li>
+<li><span class="pill s-informational">info</span> <b>Owner role</b><span class="sev">informational</span><p>Owner role is protected by a fixed requirement with no rotation path (updater: None) -- if the required badge/key is ever lost or compromised, the owner rule can never be repointed. A common and often-intentional pattern; not provably wrong from chain data alone, so this stays informational rather than a guessed fail.</p></li>
+<li><span class="pill s-not_applicable">n/a</span> <b>Resource authority</b><span class="sev">none</span><p>Not applicable: component entities carry no minter/burner/freezer/recaller role keys (those are resource-manager-specific).</p></li>
+<li><span class="pill s-informational">info</span> <b>Upgrade</b><span class="sev">informational</span><p>No prior scan exists to compare against -- this run establishes the baseline for future upgrade detection. A clean reading here is not yet a claim of &#x27;unchanged&#x27;.</p></li>
+<li><span class="pill s-informational">info</span> <b>Metadata</b><span class="sev">low</span><p>Metadata gap(s): missing expected metadata field(s) for a component: [&#x27;name&#x27;].</p></li>
+</ul></article>
+<article class="finding">
+<h3>Guild Badge Factory</h3><p class="meta"><code>component_rdx1cqlakjp65k8zkznynynsqpjcu7fwt9zcdvee358p948wp9h4n2km99</code> · component · Radix Guild</p>
+<ul>
+<li><span class="pill s-fail">FAIL</span> <b>dApp-def two-way</b><span class="sev">medium</span><p>Half-pair (reverse direction): entity does not name a dApp Definition itself, but account_rdx12yh4fwevmvnqgd3ppzau66cm9xu874srmrt9g2cye3fa8j8y78z9sq lists this entity in its own claimed_entities. Being claimed is not the same as claiming back.</p></li>
+<li><span class="pill s-informational">info</span> <b>Owner role</b><span class="sev">informational</span><p>Owner role is protected by a fixed requirement with no rotation path (updater: None) -- if the required badge/key is ever lost or compromised, the owner rule can never be repointed. A common and often-intentional pattern; not provably wrong from chain data alone, so this stays informational rather than a guessed fail.</p></li>
+<li><span class="pill s-not_applicable">n/a</span> <b>Resource authority</b><span class="sev">none</span><p>Not applicable: component entities carry no minter/burner/freezer/recaller role keys (those are resource-manager-specific).</p></li>
+<li><span class="pill s-informational">info</span> <b>Upgrade</b><span class="sev">informational</span><p>No prior scan exists to compare against -- this run establishes the baseline for future upgrade detection. A clean reading here is not yet a claim of &#x27;unchanged&#x27;.</p></li>
+<li><span class="pill s-pass">PASS</span> <b>Metadata</b><span class="sev">none</span><p>Metadata present and internally consistent: expected string fields are set, and any icon_url/info_url present is correctly typed as Url.</p></li>
+</ul></article>
+</section>
+<section>
+<div class="sec-head"><h2>What this scan does and does not claim</h2><span class="eyebrow">Recorded with the run</span></div>
+<ul class="notes">
+<li>This is the public cohort: only the entities the Guild operates itself. The scanner&#x27;s full cohort (which also covers a small set of external projects, run locally, never committed) withholds every non-Guild row from anything this repository publishes -- see docs/posture-scanner.md#embargo. Guild rows are first-class here: the scanner holds us to the same standard as anyone else, and does not exempt us from a failing result.</li>
+</ul></section>
+<footer><p>Rendered from <code>scanner/data/cohort.json</code> and the scan's own <code>report.json</code> by <code>python3 -m scanner.site</code> &mdash; no live network read, so this page is reproducible from the committed record alone. The JSON, the Markdown and this page are held in sync by test.</p></footer>
+</main></body></html>

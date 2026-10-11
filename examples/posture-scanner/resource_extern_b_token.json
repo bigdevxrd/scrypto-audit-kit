@@ -1,0 +1,493 @@
+{
+  "ledger_state": {
+    "network": "mainnet",
+    "state_version": 557840622,
+    "proposer_round_timestamp": "2026-08-31T21:19:06.179Z",
+    "epoch": 339896,
+    "round": 102
+  },
+  "items": [
+    {
+      "address": "resource_rdx1t5deegdjgx93jtmm5vlf6xw84n4ppzkcq2r2c768zpkl2v3x8yry0s",
+      "fungible_resources": {
+        "total_count": 0,
+        "items": []
+      },
+      "non_fungible_resources": {
+        "total_count": 0,
+        "items": []
+      },
+      "metadata": {
+        "total_count": 6,
+        "items": [
+          {
+            "key": "dapp_definitions",
+            "value": {
+              "typed": {
+                "values": [
+                  "account_rdx1cxkvlxd9lp246pum9yj6xhl7qg5suecljg4n62naf8dmecc5a9fwlm"
+                ],
+                "type": "GlobalAddressArray"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 4446486
+          },
+          {
+            "key": "icon_url",
+            "value": {
+              "typed": {
+                "value": "https://example-bridge-b.test/tokens/icons/token.png",
+                "type": "Url"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 4435977
+          },
+          {
+            "key": "symbol",
+            "value": {
+              "typed": {
+                "value": "xTOKB",
+                "type": "String"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 4435977
+          },
+          {
+            "key": "description",
+            "value": {
+              "typed": {
+                "value": "Wrapped Token B",
+                "type": "String"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 4435977
+          },
+          {
+            "key": "name",
+            "value": {
+              "typed": {
+                "value": "Wrapped Token B",
+                "type": "String"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 4435977
+          },
+          {
+            "key": "info_url",
+            "value": {
+              "typed": {
+                "value": "https://example-bridge-b.test/tokens/info/xTOKB",
+                "type": "Url"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 4435977
+          }
+        ]
+      },
+      "details": {
+        "role_assignments": {
+          "owner": {
+            "rule": {
+              "type": "Protected",
+              "access_rule": {
+                "type": "ProofRule",
+                "proof_rule": {
+                  "type": "Require",
+                  "requirement": {
+                    "type": "Resource",
+                    "resource": "resource_rdx1t5u4udy5lsl499rntqdzxd5gvwy0alcsjmyea72n5qwf5c4xna7swz"
+                  }
+                }
+              }
+            },
+            "updater": "Owner"
+          },
+          "entries": [
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "burner"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "Protected",
+                  "access_rule": {
+                    "type": "ProofRule",
+                    "proof_rule": {
+                      "list": [
+                        {
+                          "type": "Resource",
+                          "resource": "resource_rdx1t5u4udy5lsl499rntqdzxd5gvwy0alcsjmyea72n5qwf5c4xna7swz"
+                        },
+                        {
+                          "type": "Resource",
+                          "resource": "resource_rdx1t5z0axfuhyra24kxleuxacf5mv3jlj8zr0tvk2awd839q939f3gssc"
+                        },
+                        {
+                          "type": "NonFungible",
+                          "non_fungible": {
+                            "local_id": {
+                              "id_type": "Bytes",
+                              "sbor_hex": "5cc002209402459700a72db2785315e32c792aa66e16481767fad00266f01dec1759be51",
+                              "simple_rep": "[9402459700a72db2785315e32c792aa66e16481767fad00266f01dec1759be51]"
+                            },
+                            "resource_address": "resource_rdx1nfxxxxxxxxxxglcllrxxxxxxxxx002350006550xxxxxxxxxglcllr"
+                          }
+                        }
+                      ],
+                      "type": "AnyOf"
+                    }
+                  }
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "burner_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "minter"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "Protected",
+                  "access_rule": {
+                    "type": "ProofRule",
+                    "proof_rule": {
+                      "list": [
+                        {
+                          "type": "Resource",
+                          "resource": "resource_rdx1t5u4udy5lsl499rntqdzxd5gvwy0alcsjmyea72n5qwf5c4xna7swz"
+                        },
+                        {
+                          "type": "Resource",
+                          "resource": "resource_rdx1t5z0axfuhyra24kxleuxacf5mv3jlj8zr0tvk2awd839q939f3gssc"
+                        }
+                      ],
+                      "type": "AnyOf"
+                    }
+                  }
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "minter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "freezer"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "Protected",
+                  "access_rule": {
+                    "type": "ProofRule",
+                    "proof_rule": {
+                      "list": [
+                        {
+                          "type": "Resource",
+                          "resource": "resource_rdx1t5u4udy5lsl499rntqdzxd5gvwy0alcsjmyea72n5qwf5c4xna7swz"
+                        },
+                        {
+                          "type": "Resource",
+                          "resource": "resource_rdx1t5z0axfuhyra24kxleuxacf5mv3jlj8zr0tvk2awd839q939f3gssc"
+                        }
+                      ],
+                      "type": "AnyOf"
+                    }
+                  }
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "freezer_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "recaller"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "DenyAll"
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "recaller_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "depositor"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "AllowAll"
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "depositor_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "withdrawer"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "AllowAll"
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "withdrawer_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "burner_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "burner_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "minter_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "minter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "freezer_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "freezer_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "recaller_updater"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "DenyAll"
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "recaller_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "depositor_updater"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "DenyAll"
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "depositor_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "withdrawer_updater"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "DenyAll"
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "withdrawer_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker_updater"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "Protected",
+                  "access_rule": {
+                    "type": "ProofRule",
+                    "proof_rule": {
+                      "type": "Require",
+                      "requirement": {
+                        "type": "Resource",
+                        "resource": "resource_rdx1t5u4udy5lsl499rntqdzxd5gvwy0alcsjmyea72n5qwf5c4xna7swz"
+                      }
+                    }
+                  }
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "Protected",
+                  "access_rule": {
+                    "type": "ProofRule",
+                    "proof_rule": {
+                      "list": [
+                        {
+                          "type": "Resource",
+                          "resource": "resource_rdx1t5u4udy5lsl499rntqdzxd5gvwy0alcsjmyea72n5qwf5c4xna7swz"
+                        },
+                        {
+                          "type": "Resource",
+                          "resource": "resource_rdx1t5z0axfuhyra24kxleuxacf5mv3jlj8zr0tvk2awd839q939f3gssc"
+                        }
+                      ],
+                      "type": "AnyOf"
+                    }
+                  }
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter_updater"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "Protected",
+                  "access_rule": {
+                    "type": "ProofRule",
+                    "proof_rule": {
+                      "type": "Require",
+                      "requirement": {
+                        "type": "Resource",
+                        "resource": "resource_rdx1t5u4udy5lsl499rntqdzxd5gvwy0alcsjmyea72n5qwf5c4xna7swz"
+                      }
+                    }
+                  }
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            }
+          ]
+        },
+        "divisibility": 6,
+        "total_supply": "127862.810671",
+        "total_minted": "7143968.723479",
+        "total_burned": "7016105.912808",
+        "type": "FungibleResource"
+      }
+    }
+  ]
+}

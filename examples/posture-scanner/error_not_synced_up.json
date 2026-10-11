@@ -1,0 +1,11 @@
+{
+  "message": "The Gateway API cannot return current results as its database is not sufficiently up to date with the Network's Ledger (it is currently 7 days, 1 hour, 7 minutes, 56 seconds behind)",
+  "code": 500,
+  "details": {
+    "request_type": "Read",
+    "current_sync_delay_seconds": 608876,
+    "max_allowed_sync_delay_seconds": 720,
+    "type": "NotSyncedUpError"
+  },
+  "trace_id": "00-0ef2dfd6c3898929ab809d7c6ad7cd5d-74f5e33995e5e744-00"
+}

@@ -1,0 +1,70 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least privilege: without an explicit block the token scope is whatever the repo's
+# default happens to be — a web setting that can be widened without touching this file.
+# Neither job writes anything.
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: shellcheck audit.sh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
+        with:
+          scandir: '.'
+          ignore_paths: 'audit-reports references'
+
+  markdown:
+    name: markdownlint prompts + references
+    # ubuntu-slim: sub-minute job; minutes bill per job rounded up, so only the
+    # runner rate matters ($0.002/min vs $0.006 — see radixguild/guild test.yml).
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+      - run: npm install -g markdownlint-cli@0.39.0
+      - name: Lint markdown
+        # Ruleset lives in .markdownlint.json (auto-discovered). References bend
+        # strict markdown rules for code samples — see that file for what's relaxed.
+        run: markdownlint README.md CHANGELOG.md RELEASING.md CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md AGENTS.md VISION.md ROADMAP.md docs/ prompts/ references/ examples/ attestation/
+
+  tests:
+    name: unit tests (py${{ matrix.python-version }})
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Test the DECLARED floor, not just the newest. Testing only 3.12 is how the
+        # uninstallable [mcp]/[dev] extras shipped — and adding this matrix immediately caught
+        # that a setuptools>=77 build requirement (PEP 639) cannot coexist with a 3.8 floor.
+        include:
+          - python-version: '3.9'
+            # Not in the 24.04 runner image; 22.04 still provides it.
+            runs-on: ubuntu-22.04
+          - python-version: '3.12'
+            # sub-minute job: ubuntu-slim bills $0.002/min vs $0.006 (3.9 stays
+            # on ubuntu-22.04 — slim is one image, latest Ubuntu only)
+            runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install with dev extras (jsonschema + mcp enable contract validation + the MCP tests)
+        # On 3.9 the mcp marker resolves the extra to nothing — that is the point of this
+        # matrix entry: the install must SUCCEED there, with the MCP tests skipping cleanly.
+        run: pip install ".[dev]"
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests -t .

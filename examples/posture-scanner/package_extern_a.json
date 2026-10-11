@@ -1,0 +1,164 @@
+{
+  "ledger_state": {
+    "network": "mainnet",
+    "state_version": 557840622,
+    "proposer_round_timestamp": "2026-08-31T21:19:06.179Z",
+    "epoch": 339896,
+    "round": 102
+  },
+  "items": [
+    {
+      "address": "package_rdx1pkueysly7fwkpsuqs7kptveqpx7ehmwgrgp23szgyeyhc2w29es6zc",
+      "metadata": {
+        "total_count": 3,
+        "items": [
+          {
+            "key": "dapp_definition",
+            "value": {
+              "typed": {
+                "value": "account_rdx12yvnm9jmj5phn0t6fkjcke3xpcg5f790cawrggn82xjzeyh0knz6jn",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 223200868
+          },
+          {
+            "key": "registry",
+            "value": {
+              "typed": {
+                "value": "component_rdx1cp973z25felvayrw7nf72g9avmjxskk0nwm3m79r8kd9ntud9rr897",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 223200868
+          },
+          {
+            "key": "hook_packages",
+            "value": {
+              "typed": {
+                "values": [],
+                "type": "GlobalAddressArray"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 223200868
+          }
+        ]
+      },
+      "details": {
+        "vm_type": "ScryptoV1",
+        "type": "Package",
+        "codes": {
+          "total_count": 1,
+          "items": [
+            {
+              "vm_type": "ScryptoV1",
+              "code_hash_hex": "2678bfc35cd9092e17cb15577fcd41d2abed92e43885e83f6a06c18ad7519937"
+            }
+          ]
+        },
+        "blueprints": {
+          "total_count": 1,
+          "items": [
+            {
+              "name": "Pool",
+              "version": "1.0.0"
+            }
+          ]
+        },
+        "role_assignments": {
+          "owner": {
+            "rule": {
+              "type": "Protected",
+              "access_rule": {
+                "type": "ProofRule",
+                "proof_rule": {
+                  "type": "Require",
+                  "requirement": {
+                    "type": "Resource",
+                    "resource": "resource_rdx1thkq4j7gyzhm667dh7g3wtllhkv8h4vj6tq8yykegml20td237czdx"
+                  }
+                }
+              }
+            },
+            "updater": "Owner"
+          },
+          "entries": [
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "securify_owner"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": []
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

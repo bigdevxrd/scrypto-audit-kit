@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/schema/posture-scan-report.schema.json",
+  "title": "scrypto-audit-kit posture-scan report",
+  "description": "Output of the posture scanner (scanner/): a read-only pass over a cohort of live Radix mainnet entities checking five structural facts (dApp-definition two-way verification, owner role, resource authority, package/blueprint upgrade, metadata claims). This is a DIFFERENT report shape from schema/audit-report.schema.json: it carries no source_hash (there is no source under review, only on-ledger state), and its unit of comparison is two scan runs over time, not one run over one blueprint. Never merged into the audit-report schema or the L1-L4 attestation ladder.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "scan_id", "generated_at", "network", "gateway", "cohort_source", "entities"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
+
+    "scan_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier for this run, derived from generated_at + the pinned state_version. Used as the diff key's namespace and as the results filename stem."
+    },
+
+    "generated_at": {
+      "type": "string",
+      "description": "UTC wall-clock timestamp (ISO 8601, Z-suffixed) when this scan was executed. NOT the ledger timestamp -- see gateway.pinned_proposer_round_timestamp for that."
+    },
+
+    "network": { "type": "string", "enum": ["mainnet", "stokenet"] },
+
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "pinned_state_version", "halted"],
+      "properties": {
+        "url": { "type": "string", "description": "The Gateway base URL every read in this scan was made against." },
+        "pinned_state_version": {
+          "type": "integer",
+          "description": "The at_ledger_state.state_version every /state/entity/details read in this scan was pinned to. Discovered via an unpinned /status/gateway-status call at the start of the run (see docs/posture-scanner.md -- this is the only unpinned call the scanner makes)."
+        },
+        "pinned_proposer_round_timestamp": { "type": ["string", "null"], "description": "The ledger's own timestamp at the pinned state_version, echoed from gateway-status, when available." },
+        "halted": {
+          "type": "boolean",
+          "description": "True if an unpinned /state/entity/details probe this run came back as a NotSyncedUpError (docs/posture-scanner.md's halt-detection note) -- i.e. the network is not advancing past pinned_state_version. False does not by itself mean 'no changes are pending' -- see halt_detail."
+        },
+        "halt_detail": {
+          "type": ["string", "null"],
+          "description": "The raw NotSyncedUpError message when halted=true, else null. A clean 'no changes since last scan' reading during a halt is not the same claim as 'no changes are pending' -- deferred upgrades can land all at once once the chain resumes."
+        }
+      }
+    },
+
+    "cohort_source": {
+      "type": "string",
+      "description": "Path (repo-relative) to the cohort config this scan was run against, e.g. scanner/data/cohort.json. Recorded so a reader can see exactly which entities were in scope for this run."
+    },
+
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Free-text, run-level caveats meant to be shown alongside the results -- e.g. a halt-interpretation caveat, or a cohort substitution the operator should know about."
+    },
+
+    "entities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entity_result" }
+    }
+  },
+
+  "$defs": {
+    "entity_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "project", "category", "address", "entity_kind", "label", "checks"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Stable cohort id, e.g. 'example-project-pool-xrd-fusd'. This is the diff key together with each check's 'check' name -- it must not change across scans for the same real-world entity, or diffing will read it as remove+add instead of changed."
+        },
+        "project": { "type": "string", "minLength": 1, "description": "Human name of the project this entity belongs to, e.g. 'Example Project', 'Radix Guild'." },
+        "category": {
+          "enum": ["external", "guild"],
+          "description": "'guild' = an entity this project's own operators control (radixguild.com / the Guild dApp). 'external' = a third-party project. The scanner applies identical logic to both -- this field is provenance, never a severity input."
+        },
+        "address": { "type": "string", "pattern": "^(account|component|resource|package)_(rdx|tdx)1[a-zA-Z0-9]+$" },
+        "entity_kind": { "enum": ["account", "component", "resource", "package"] },
+        "label": { "type": "string", "minLength": 1, "description": "Short human label, e.g. 'XRD-fUSD Pool V2'." },
+        "role": {
+          "type": "string",
+          "description": "Optional cohort-config hint changing how a check is evaluated for this entity, e.g. 'dapp_definition_hub' for an account whose own dApp-Definition-ness is being checked rather than a claim it makes."
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/check_result" }
+        }
+      }
+    },
+
+    "check_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check", "status", "severity", "reason", "evidence", "embargo", "state_version"],
+      "properties": {
+        "check": {
+          "enum": ["dapp_definition_two_way", "owner_role", "resource_authority", "package_upgrade", "metadata_claims"]
+        },
+        "status": {
+          "enum": ["pass", "fail", "informational", "not_applicable"],
+          "description": "'fail' is reserved for shapes the scanner can PROVE are wrong from chain data alone (e.g. AllowAll on a mint role). Ambiguous-intent shapes (e.g. OwnerRole::None) are 'informational', never 'fail' -- see severity's own note."
+        },
+        "severity": {
+          "enum": ["none", "informational", "low", "medium", "high", "critical"],
+          "description": "'informational' is the required floor whenever the check cannot determine intent from chain data alone -- it is never escalated to high/critical without a status of 'fail' backing it. 'not_applicable' status always carries severity 'none'."
+        },
+        "reason": { "type": "string", "minLength": 1, "description": "Human-readable explanation, written to stand alone on a public page without the evidence block." },
+        "evidence": {
+          "type": "object",
+          "description": "The exact fields this check read, as a flat-ish key/value map using dotted Gateway field paths as keys (e.g. 'role_assignments.owner.rule.type'). Verbatim, not paraphrased -- a reader should be able to re-derive 'reason' from 'evidence' alone.",
+          "minProperties": 1
+        },
+        "embargo": { "$ref": "#/$defs/embargo" },
+        "state_version": {
+          "type": "integer",
+          "description": "The at_ledger_state.state_version this specific finding's read was pinned at. Equal to gateway.pinned_state_version for every finding in a single scan run today (one gateway-status call per run), but recorded per-finding rather than assumed, since a future multi-pass run could pin different entities at different moments."
+        }
+      }
+    },
+
+    "embargo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "publish_at", "reason"],
+      "description": "Present on every finding from the first scan, not retrofitted. All five posture checks report STATED CONFIGURATION (what a role/metadata field is currently set to) rather than a derived exploit path, so they default to public/immediate -- see docs/posture-scanner.md#embargo. The mechanism exists so a future check that DOES derive a concrete fund-extraction path (e.g. a working drain manifest) has somewhere to declare a private-disclosure clock without a schema change.",
+      "properties": {
+        "status": { "enum": ["public", "embargoed"] },
+        "publish_at": {
+          "type": ["string", "null"],
+          "description": "ISO 8601 UTC timestamp after which an embargoed finding may be shown in full. Null when status is 'public'."
+        },
+        "reason": {
+          "type": ["string", "null"],
+          "description": "Why this finding is embargoed (e.g. 'describes a working fund-extraction path; maintainer notified 2026-09-10, discloses 2026-12-09'). Null when status is 'public'."
+        }
+      },
+      "if": { "properties": { "status": { "const": "embargoed" } } },
+      "then": { "required": ["publish_at", "reason"], "properties": { "publish_at": { "type": "string" }, "reason": { "type": "string" } } }
+    }
+  }
+}

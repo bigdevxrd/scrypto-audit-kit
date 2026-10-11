@@ -1,0 +1,208 @@
+{
+  "ledger_state": {
+    "network": "mainnet",
+    "state_version": 557840622,
+    "proposer_round_timestamp": "2026-08-31T21:19:06.179Z",
+    "epoch": 339896,
+    "round": 102
+  },
+  "items": [
+    {
+      "address": "component_rdx1cqu5uxws3erxzd0vmesjytgvltftpjr53t4zcf4c24d704zchjxrvv",
+      "fungible_resources": {
+        "total_count": 0,
+        "items": []
+      },
+      "non_fungible_resources": {
+        "total_count": 0,
+        "items": []
+      },
+      "metadata": {
+        "total_count": 7,
+        "items": [
+          {
+            "key": "resource_x",
+            "value": {
+              "typed": {
+                "value": "resource_rdx1t437dntwp9lmhzscqccv9csptzgtxz6k8t20qc6lnm6d6efhj3ck66",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 395153698
+          },
+          {
+            "key": "weight_y",
+            "value": {
+              "typed": {
+                "value": "0.5",
+                "type": "Decimal"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 395153698
+          },
+          {
+            "key": "fee",
+            "value": {
+              "typed": {
+                "value": "0.003",
+                "type": "Decimal"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 395153698
+          },
+          {
+            "key": "lp_resource",
+            "value": {
+              "typed": {
+                "value": "resource_rdx1tkynhqjckwk7h8erw8995jtu2pv2pj6mylpntkuy835y493666mq9e",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 395153698
+          },
+          {
+            "key": "weight_x",
+            "value": {
+              "typed": {
+                "value": "0.5",
+                "type": "Decimal"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 395153698
+          },
+          {
+            "key": "resource_y",
+            "value": {
+              "typed": {
+                "value": "resource_rdx1tknxxxxxxxxxradxrdxxxxxxxxx009923554798xxxxxxxxxradxrd",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 395153698
+          },
+          {
+            "key": "pool_component",
+            "value": {
+              "typed": {
+                "value": "pool_rdx1ckdjgjggjj442pky8gekx6vqe7wr74qj4pny3xhuwxgn37s8zjl08n",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 395153698
+          }
+        ]
+      },
+      "details": {
+        "package_address": "package_rdx1pkrqq83g9nka6nunjuavylsawavsp73flhq6x7kjyymw59u246dtnq",
+        "blueprint_name": "WeightedPool",
+        "blueprint_version": "1.0.0",
+        "role_assignments": {
+          "owner": {
+            "rule": {
+              "type": "Protected",
+              "access_rule": {
+                "type": "ProofRule",
+                "proof_rule": {
+                  "type": "Require",
+                  "requirement": {
+                    "type": "Resource",
+                    "resource": "resource_rdx1ngs8jrvqe5hhw8993njdteufxqvz7zltrm5w26xwvj2s272uqmfz8v"
+                  }
+                }
+              }
+            },
+            "updater": "Owner"
+          },
+          "entries": [
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "user"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "AllowAll"
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "_owner_"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            }
+          ]
+        },
+        "type": "Component"
+      }
+    }
+  ]
+}

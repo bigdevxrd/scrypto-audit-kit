@@ -1,0 +1,224 @@
+{
+  "ledger_state": {
+    "network": "mainnet",
+    "state_version": 557840622,
+    "proposer_round_timestamp": "2026-08-31T21:19:06.179Z",
+    "epoch": 339896,
+    "round": 102
+  },
+  "items": [
+    {
+      "address": "component_rdx1czexylvvm0q4uhwpjaqmlznj9sd3y2jnmmah6qug9lm9sfm3tyrtva",
+      "fungible_resources": {
+        "total_count": 1,
+        "items": [
+          {
+            "amount": "1",
+            "last_updated_at_state_version": 483855245,
+            "aggregation_level": "Global",
+            "resource_address": "resource_rdx1t5ne0d2kjqpj5d3sxcwaq7aynhky03alyadyjs76xugqxvgyx86d0t"
+          }
+        ]
+      },
+      "non_fungible_resources": {
+        "total_count": 0,
+        "items": []
+      },
+      "metadata": {
+        "total_count": 0,
+        "items": []
+      },
+      "details": {
+        "package_address": "package_rdx1phm53al5ztrfw8k5wa3qc5pllwfyeqgl4spjcy83ymgw8jhngx7vu3",
+        "blueprint_name": "BadgeManager",
+        "blueprint_version": "1.0.0",
+        "role_assignments": {
+          "owner": {
+            "rule": {
+              "type": "Protected",
+              "access_rule": {
+                "type": "ProofRule",
+                "proof_rule": {
+                  "type": "Require",
+                  "requirement": {
+                    "type": "Resource",
+                    "resource": "resource_rdx1tkkzwrttvsqrsylyf4nqt2fxq6h27eva4lr4ffwad63x3f2cl43xwe"
+                  }
+                }
+              }
+            },
+            "updater": "None"
+          },
+          "entries": [
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "admin"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "_owner_"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Royalty",
+                "name": "royalty_setter"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Royalty",
+                  "name": "royalty_setter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Royalty",
+                "name": "royalty_setter_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Royalty",
+                  "name": "royalty_setter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Royalty",
+                "name": "royalty_locker"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Royalty",
+                  "name": "royalty_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Royalty",
+                "name": "royalty_locker_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Royalty",
+                  "name": "royalty_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Royalty",
+                "name": "royalty_claimer"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Royalty",
+                  "name": "royalty_claimer_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Royalty",
+                "name": "royalty_claimer_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Royalty",
+                  "name": "royalty_claimer_updater"
+                }
+              ]
+            }
+          ]
+        },
+        "type": "Component"
+      }
+    }
+  ]
+}

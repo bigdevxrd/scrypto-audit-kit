@@ -1,0 +1,289 @@
+{
+  "ledger_state": {
+    "network": "mainnet",
+    "state_version": 557840622,
+    "proposer_round_timestamp": "2026-08-31T21:19:06.179Z",
+    "epoch": 339896,
+    "round": 102
+  },
+  "items": [
+    {
+      "address": "component_rdx1cpmgqg4cuq54a74kl38g03wfxjsq9w02e8twt79jlh0sw4qpnrylpj",
+      "fungible_resources": {
+        "total_count": 2,
+        "items": [
+          {
+            "amount": "0.658837979307",
+            "last_updated_at_state_version": 557826508,
+            "aggregation_level": "Global",
+            "resource_address": "resource_rdx1tknxxxxxxxxxradxrdxxxxxxxxx009923554798xxxxxxxxxradxrd"
+          },
+          {
+            "amount": "0.004995074793740958",
+            "last_updated_at_state_version": 557823719,
+            "aggregation_level": "Global",
+            "resource_address": "resource_rdx1tkt5xsc3psk2n99ntc58fzsr608v30686dyjmx8ce4vsr29dr57q4d"
+          }
+        ]
+      },
+      "non_fungible_resources": {
+        "total_count": 0,
+        "items": []
+      },
+      "metadata": {
+        "total_count": 13,
+        "items": [
+          {
+            "key": "flash_loan_fee_rate",
+            "value": {
+              "typed": {
+                "value": "0.0009",
+                "type": "Decimal"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "hooks",
+            "value": {
+              "typed": {
+                "values": [],
+                "type": "GlobalAddressArray"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "dapp_definition",
+            "value": {
+              "typed": {
+                "value": "account_rdx12yvnm9jmj5phn0t6fkjcke3xpcg5f790cawrggn82xjzeyh0knz6jn",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "flash_loan_address",
+            "value": {
+              "typed": {
+                "value": "resource_rdx1n2t5yg073z8n3saehfftrdwwqqgz5jfqfj543jal7uxxh0hggyx3hl",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "pool_address",
+            "value": {
+              "typed": {
+                "value": "component_rdx1cpmgqg4cuq54a74kl38g03wfxjsq9w02e8twt79jlh0sw4qpnrylpj",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "x_address",
+            "value": {
+              "typed": {
+                "value": "resource_rdx1tkt5xsc3psk2n99ntc58fzsr608v30686dyjmx8ce4vsr29dr57q4d",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "input_fee_rate",
+            "value": {
+              "typed": {
+                "value": "0.003",
+                "type": "Decimal"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "liquidity_pool",
+            "value": {
+              "typed": {
+                "value": "pool_rdx1chcdzfexne2xdlcpew5hc55ru405626shg776yvspvycu67950ykuy",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "registry",
+            "value": {
+              "typed": {
+                "value": "component_rdx1cp973z25felvayrw7nf72g9avmjxskk0nwm3m79r8kd9ntud9rr897",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "name",
+            "value": {
+              "typed": {
+                "value": "External Pool A2 TOKEN/XRD",
+                "type": "String"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "lp_address",
+            "value": {
+              "typed": {
+                "value": "resource_rdx1thc009qttmkeuurdztp06d8duaa6rnpzquxptvyf9vya6eqwpgwnf4",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "x_share",
+            "value": {
+              "typed": {
+                "value": "0.5",
+                "type": "Decimal"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          },
+          {
+            "key": "y_address",
+            "value": {
+              "typed": {
+                "value": "resource_rdx1tknxxxxxxxxxradxrdxxxxxxxxx009923554798xxxxxxxxxradxrd",
+                "type": "GlobalAddress"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 299043910
+          }
+        ]
+      },
+      "details": {
+        "package_address": "package_rdx1pkueysly7fwkpsuqs7kptveqpx7ehmwgrgp23szgyeyhc2w29es6zc",
+        "blueprint_name": "Pool",
+        "blueprint_version": "1.0.0",
+        "role_assignments": {
+          "owner": {
+            "rule": {
+              "type": "DenyAll"
+            },
+            "updater": "None"
+          },
+          "entries": [
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "blueprint"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "Protected",
+                  "access_rule": {
+                    "type": "ProofRule",
+                    "proof_rule": {
+                      "type": "Require",
+                      "requirement": {
+                        "type": "NonFungible",
+                        "non_fungible": {
+                          "local_id": {
+                            "id_type": "Bytes",
+                            "sbor_hex": "5cc00220c7dd95890dcf246bdb3ae82f28f41d782fec5d03e95e492039b4c5a49e8421f8",
+                            "simple_rep": "[c7dd95890dcf246bdb3ae82f28f41d782fec5d03e95e492039b4c5a49e8421f8]"
+                          },
+                          "resource_address": "resource_rdx1nfxxxxxxxxxxglcllrxxxxxxxxx002350006550xxxxxxxxxglcllr"
+                        }
+                      }
+                    }
+                  }
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": []
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            }
+          ]
+        },
+        "type": "Component"
+      }
+    }
+  ]
+}

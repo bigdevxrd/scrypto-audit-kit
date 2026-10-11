@@ -1,0 +1,82 @@
+# Static analysis (the deterministic tier)
+
+The kit runs a **deterministic static pass** over the source before (and independently of)
+the LLM. It's free, reproducible, needs no API key, and catches mechanical Scrypto footguns
+that don't need a model to spot. This is the bottom of the [trust ladder](../VISION.md) — and
+the first thing an agent should run.
+
+```bash
+./audit.sh --static-only <package>     # free, instant, no API key, no toolchain
+```
+
+It also runs as part of every full `./audit.sh` (merged into the report), and is exposed to
+agents as the `static_scan` MCP tool. Findings use `S-###` ids and `source: "static"`.
+
+## Precision by design
+
+Rules run over the source **after** a comment/string-aware stripper blanks the *contents* of
+comments and string/char literals (it handles nested block comments and string line-continuations,
+preserving line numbers). So **code** rules don't match inside a `// comment` or a `"string
+literal"`. Three rules intentionally read the other view — `hardcoded-address` and
+`hand-rolled-address-check` check string literals, `todo-comment` checks comments. Rules are
+deliberately **high-precision** (they prefer to miss over to over-flag); recall is the LLM pass's job.
+
+## Rules
+
+Fifteen rules. v0.8.0 shipped fourteen of them;
+`public-privileged-method` was added in v0.8.1.
+
+| Rule | Severity | Class | Catches |
+|------|----------|-------|---------|
+| `float-usage` | high | Integer / decimal arithmetic | `f32`/`f64` types in on-ledger math |
+| `missing-method-auth` | high | Auth bypass | a `#[blueprint]` with `pub fn`s but no `enable_method_auth!` — fires only on an ABSENT macro, never on what a present one declares |
+| `public-privileged-method` | **critical** / high | Auth bypass | a method the macro declares `=> PUBLIC` that moves value, mints/burns (critical) or writes `self.*` from a parameter (high) while taking no credential and asserting nothing. **Single-function and textual: indirection through a private helper, an unused credential parameter, or any unrelated `assert!` all evade it — see the rule's docstring for the measured list** |
+| `hardcoded-address` | medium | External calls / composability | bech32 address literals (`resource_rdx1…`) in source |
+| `hand-rolled-address-check` | medium | External calls / composability | `.starts_with("account_rdx1")` — an address accepted on its prefix, with no bech32m decode |
+| `unbounded-take-all` | medium | Resource handling | `.take_all()` — a whole-vault drain |
+| `owner-role-none` | medium | Upgrade safety | `prepare_to_globalize(OwnerRole::None)` — no owner |
+| `owner-role-fixed` | low | Upgrade safety | `prepare_to_globalize(OwnerRole::Fixed(…))` — an owner rule that can never be re-pointed |
+| `self-updatable-role` | medium | Upgrade safety | a role `updatable_by` itself |
+| `unsafe-block` | medium | Memory safety | `unsafe { … }` |
+| `panic-macro` | low | Error handling | `panic!`/`todo!`/`unimplemented!`/`unreachable!` |
+| `raw-decimal-arith` | medium | Integer / decimal arithmetic | raw `*`/`/` on a `.amount()` / `dec!()` Decimal — overflow / div-by-zero |
+| `public-mint-burn` | medium | Auth bypass | a `pub fn` named mint/burn that its blueprint's `enable_method_auth!` does not restrict |
+| `unwrap-expect` | info | Error handling | `.unwrap()` / `.expect()` — a panic surface |
+| `todo-comment` | info | Maintainability | `TODO`/`FIXME`/`XXX`/`HACK` markers |
+
+These are a starting set — high-signal footguns that are unambiguous to detect. The LLM pass
+covers the semantic classes (reentrancy, oracle manipulation, state-machine gaps, slippage, …)
+that a regex can't judge reliably.
+
+## Suppressing a finding
+
+Put a `// sak:allow <rule-id>` comment on the offending line, or on a line of its own directly
+above it (a comment trailing code suppresses that line only — it does not carry to the next):
+
+```rust
+self.vault.take_all() // sak:allow unbounded-take-all  (redeem path: caller already gated)
+```
+
+Every suppression must name one rule. There is no blanket form: `// sak:allow all` is **rejected**,
+because suppressions live in source written by the party under audit and "hide everything" would be
+a hole. Suppressions are visible in the diff, so a reviewer can see exactly what was waived and why.
+
+## Adding a rule
+
+Rules live in [`bin/static_analysis.py`](../bin/static_analysis.py) as small functions
+registered with `@rule`. A rule reads the per-file context (`stripped_lines` for code,
+`comments_lines` when it needs comments, `code_with_strings_lines` when it needs string
+literals) and yields findings via the `_f(...)` helper:
+
+```python
+@rule
+def r_my_check(ctx):
+    for lineno, line, _m in _matches(ctx["stripped_lines"], r"\bsome_pattern\b"):
+        yield _f(lineno, "my-check", "medium", "Resource handling",
+                 "short title", "what was found", "why it matters", "how to fix")
+```
+
+Then add a case to the planted-bug fixture (or a focused snippet) and assert it in
+[`tests/test_static_analysis.py`](../tests/test_static_analysis.py) — including a
+*negative* test proving it doesn't fire on benign code. Keep precision high: a noisy rule
+is worse than no rule. Run `make test`.

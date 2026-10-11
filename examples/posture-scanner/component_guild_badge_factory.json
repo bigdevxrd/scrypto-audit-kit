@@ -1,0 +1,150 @@
+{
+  "ledger_state": {
+    "network": "mainnet",
+    "state_version": 557840622,
+    "proposer_round_timestamp": "2026-08-31T21:19:06.179Z",
+    "epoch": 339896,
+    "round": 102
+  },
+  "items": [
+    {
+      "address": "component_rdx1cqlakjp65k8zkznynynsqpjcu7fwt9zcdvee358p948wp9h4n2km99",
+      "fungible_resources": {
+        "total_count": 0,
+        "items": []
+      },
+      "non_fungible_resources": {
+        "total_count": 0,
+        "items": []
+      },
+      "metadata": {
+        "total_count": 2,
+        "items": [
+          {
+            "key": "description",
+            "value": {
+              "typed": {
+                "value": "Permissionless badge infrastructure for Radix",
+                "type": "String"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 483059912
+          },
+          {
+            "key": "name",
+            "value": {
+              "typed": {
+                "value": "Radix Badge Factory",
+                "type": "String"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 483059912
+          }
+        ]
+      },
+      "details": {
+        "package_address": "package_rdx1ph03wnq9x4q9z9ufc2anrrmeeu03fu92uk9wkyr8fg50rdgxut2wtd",
+        "blueprint_name": "BadgeFactory",
+        "blueprint_version": "1.0.0",
+        "role_assignments": {
+          "owner": {
+            "rule": {
+              "type": "Protected",
+              "access_rule": {
+                "type": "ProofRule",
+                "proof_rule": {
+                  "type": "Require",
+                  "requirement": {
+                    "type": "Resource",
+                    "resource": "resource_rdx1tkesmrn7ffmfgz5l0q6zls6rfsnlhfwcrd5hnzl2n6ymmwsft7hazn"
+                  }
+                }
+              }
+            },
+            "updater": "None"
+          },
+          "entries": [
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "factory_admin"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "_owner_"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            }
+          ]
+        },
+        "type": "Component"
+      }
+    }
+  ]
+}

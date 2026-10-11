@@ -1,0 +1,264 @@
+{
+  "ledger_state": {
+    "network": "mainnet",
+    "state_version": 557840622,
+    "proposer_round_timestamp": "2026-08-31T21:19:06.179Z",
+    "epoch": 339896,
+    "round": 102
+  },
+  "items": [
+    {
+      "address": "account_rdx12yvnm9jmj5phn0t6fkjcke3xpcg5f790cawrggn82xjzeyh0knz6jn",
+      "metadata": {
+        "total_count": 9,
+        "items": [
+          {
+            "key": "info_url",
+            "value": {
+              "typed": {
+                "value": "https://example-dex-a.test",
+                "type": "Url"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 1922857
+          },
+          {
+            "key": "claimed_entities",
+            "value": {
+              "typed": {
+                "values": [
+                  "component_rdx1crxs6um84jfjuxl5eu9ygsh9n422lyrg4fnlnd076ckf96g5820uav",
+                  "component_rdx1cqeu3fcef3lmlkpcmzfcvcrq6w0pwvpya7lluzcr9vamadh7uah40s",
+                  "component_rdx1czzn2juhz20df58wceglvrsnvu5jsryjspfgp0wcrlpsjjhr77uxy0",
+                  "component_rdx1czw9u5a9mvguacur2dauctd47k5awav02y0dzaly5jrhdxm4f4j9rv",
+                  "component_rdx1cqh28qe4vgnghjpd5t45kcepm3j7f5aj57yvs0l7pjjp7ggr0j9uqe",
+                  "component_rdx1czr4yglnsee33f6yprtyn7aquk7q95k2ceqeke80pav2hr2fls0gty"
+                ],
+                "type": "GlobalAddressArray"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 69615132,
+            "_fixture_note": "trimmed from 100 real entries to 6 for fixture size; membership of must_keep addresses preserved exactly as verified live"
+          },
+          {
+            "key": "account_type",
+            "value": {
+              "typed": {
+                "value": "dapp definition",
+                "type": "String"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 1535223
+          },
+          {
+            "key": "icon_url",
+            "value": {
+              "typed": {
+                "value": "https://example-dex-a.test/icons/logo.png",
+                "type": "Url"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 1922857
+          },
+          {
+            "key": "description",
+            "value": {
+              "typed": {
+                "value": "External Project A is a decentralized exchange on Radix",
+                "type": "String"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 1922857
+          },
+          {
+            "key": "name",
+            "value": {
+              "typed": {
+                "value": "External Project A",
+                "type": "String"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 1922857
+          },
+          {
+            "key": "claimed_websites",
+            "value": {
+              "typed": {
+                "values": [
+                  "https://example-dex-a.test"
+                ],
+                "type": "OriginArray"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 2797313
+          },
+          {
+            "key": "owner_keys",
+            "value": {
+              "typed": {
+                "values": [
+                  {
+                    "hash_hex": "051f34d7e62c96d22afe1c933b916500262a36ba7fdc58051d54ea48a3",
+                    "key_hash_type": "EddsaEd25519"
+                  }
+                ],
+                "type": "PublicKeyHashArray"
+              }
+            },
+            "is_locked": false,
+            "last_updated_at_state_version": 1532713
+          },
+          {
+            "key": "owner_badge",
+            "value": {
+              "typed": {
+                "value": "[9eaa645990fc6f7b13619931f1597a6b4d7fdf1688e1ad03155f31b6e1a5]",
+                "type": "NonFungibleLocalId"
+              }
+            },
+            "is_locked": true,
+            "last_updated_at_state_version": 1532713
+          }
+        ]
+      },
+      "details": {
+        "package_address": "package_rdx1pkgxxxxxxxxxaccntxxxxxxxxxx000929625493xxxxxxxxxaccntx",
+        "blueprint_name": "Account",
+        "blueprint_version": "1.0.0",
+        "state": {
+          "default_deposit_rule": "Accept"
+        },
+        "role_assignments": {
+          "owner": {
+            "rule": {
+              "type": "Protected",
+              "access_rule": {
+                "type": "ProofRule",
+                "proof_rule": {
+                  "type": "Require",
+                  "requirement": {
+                    "type": "NonFungible",
+                    "non_fungible": {
+                      "local_id": {
+                        "id_type": "Bytes",
+                        "sbor_hex": "5cc0021d051f34d7e62c96d22afe1c933b916500262a36ba7fdc58051d54ea48a3",
+                        "simple_rep": "[051f34d7e62c96d22afe1c933b916500262a36ba7fdc58051d54ea48a3]"
+                      },
+                      "resource_address": "resource_rdx1nfxxxxxxxxxxed25sgxxxxxxxxx002236757237xxxxxxxxxed25sg"
+                    }
+                  }
+                }
+              }
+            },
+            "updater": "Object"
+          },
+          "entries": [
+            {
+              "role_key": {
+                "module": "Main",
+                "name": "securify"
+              },
+              "assignment": {
+                "explicit_rule": {
+                  "type": "Protected",
+                  "access_rule": {
+                    "type": "ProofRule",
+                    "proof_rule": {
+                      "type": "Require",
+                      "requirement": {
+                        "type": "NonFungible",
+                        "non_fungible": {
+                          "local_id": {
+                            "id_type": "Bytes",
+                            "sbor_hex": "5cc0021d051f34d7e62c96d22afe1c933b916500262a36ba7fdc58051d54ea48a3",
+                            "simple_rep": "[051f34d7e62c96d22afe1c933b916500262a36ba7fdc58051d54ea48a3]"
+                          },
+                          "resource_address": "resource_rdx1nfxxxxxxxxxxed25sgxxxxxxxxx002236757237xxxxxxxxxed25sg"
+                        }
+                      }
+                    }
+                  }
+                },
+                "resolution": "Explicit"
+              },
+              "updater_roles": [
+                {
+                  "module": "Main",
+                  "name": "_self_"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_locker_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_locker_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            },
+            {
+              "role_key": {
+                "module": "Metadata",
+                "name": "metadata_setter_updater"
+              },
+              "assignment": {
+                "resolution": "Owner"
+              },
+              "updater_roles": [
+                {
+                  "module": "Metadata",
+                  "name": "metadata_setter_updater"
+                }
+              ]
+            }
+          ]
+        },
+        "type": "Component"
+      }
+    }
+  ]
+}

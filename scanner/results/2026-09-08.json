@@ -1,0 +1,303 @@
+{
+  "schema_version": "1.0",
+  "scan_id": "20260908T001052Z-sv557840622",
+  "generated_at": "2026-09-08T00:10:52Z",
+  "network": "mainnet",
+  "gateway": {
+    "url": "https://mainnet.radixdlt.com",
+    "pinned_state_version": 557840622,
+    "pinned_proposer_round_timestamp": "2026-08-31T21:19:06.179Z",
+    "halted": true,
+    "halt_detail": "The Gateway API cannot return current results as its database is not sufficiently up to date with the Network's Ledger (it is currently 7 days, 2 hours, 51 minutes, 47 seconds behind)"
+  },
+  "cohort_source": "scanner/data/cohort.json",
+  "notes": [
+    "Mainnet was halted at the time of this scan (unpinned probe returned NotSyncedUpError). A clean 'no change since last scan' reading during a halt is not the same claim as 'no changes are pending' -- deferred upgrades/governance actions could land all at once once the chain resumes.",
+    "This scan covered 7 entities; 4 third-party entities are withheld from this published report. Only the entities we operate ourselves are shown here.",
+    "4 cohort notes were withheld from this published report because they referenced a name this report does not publish."
+  ],
+  "entities": [
+    {
+      "id": "guild-dapp-definition-account",
+      "project": "Radix Guild",
+      "category": "guild",
+      "address": "account_rdx12yh4fwevmvnqgd3ppzau66cm9xu874srmrt9g2cye3fa8j8y78z9sq",
+      "entity_kind": "account",
+      "label": "Radix Guild dApp Definition account",
+      "role": "dapp_definition_hub",
+      "checks": [
+        {
+          "check": "dapp_definition_two_way",
+          "status": "pass",
+          "severity": "none",
+          "reason": "Valid dApp Definition account: account_type is 'dapp definition' and it claims 3 entities back. Each claiming entity's own two-way status is evaluated at that entity's own cohort row, not repeated here.",
+          "evidence": {
+            "metadata.account_type": "dapp definition",
+            "metadata.claimed_entities.count": 3
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "owner_role",
+          "status": "pass",
+          "severity": "none",
+          "reason": "Owner role is protected by a requirement AND rotatable (updater: Object) -- the badge holder (or the object's own self-securify path) can repoint the owner rule if it is ever compromised.",
+          "evidence": {
+            "role_assignments.owner.rule.type": "Protected",
+            "role_assignments.owner.updater": "Object"
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "resource_authority",
+          "status": "not_applicable",
+          "severity": "none",
+          "reason": "Not applicable: account entities carry no minter/burner/freezer/recaller role keys (those are resource-manager-specific).",
+          "evidence": {
+            "entity_kind": "account"
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "package_upgrade",
+          "status": "not_applicable",
+          "severity": "none",
+          "reason": "Not applicable: account entities carry no upgradable code.",
+          "evidence": {
+            "entity_kind": "account"
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "metadata_claims",
+          "status": "pass",
+          "severity": "none",
+          "reason": "Metadata present and internally consistent: expected string fields are set, and any icon_url/info_url present is correctly typed as Url.",
+          "evidence": {
+            "metadata.name": "Radix Guild",
+            "metadata.symbol": null,
+            "metadata.description": "Community governance infrastructure for Radix",
+            "metadata.icon_url": null,
+            "metadata.info_url": null
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        }
+      ]
+    },
+    {
+      "id": "guild-badge-manager",
+      "project": "Radix Guild",
+      "category": "guild",
+      "address": "component_rdx1czexylvvm0q4uhwpjaqmlznj9sd3y2jnmmah6qug9lm9sfm3tyrtva",
+      "entity_kind": "component",
+      "label": "Guild Badge Manager",
+      "checks": [
+        {
+          "check": "dapp_definition_two_way",
+          "status": "fail",
+          "severity": "medium",
+          "reason": "Does not name a dApp Definition at all (no 'dapp_definition' or 'dapp_definitions' metadata key), and is not listed by any dApp Definition account this scan knows about -- zero-sided, not just unverified.",
+          "evidence": {
+            "metadata.dapp_definition(s)": null,
+            "reverse_claimed_by": []
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "owner_role",
+          "status": "informational",
+          "severity": "informational",
+          "reason": "Owner role is protected by a fixed requirement with no rotation path (updater: None) -- if the required badge/key is ever lost or compromised, the owner rule can never be repointed. A common and often-intentional pattern; not provably wrong from chain data alone, so this stays informational rather than a guessed fail.",
+          "evidence": {
+            "role_assignments.owner.rule.type": "Protected",
+            "role_assignments.owner.updater": "None"
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "resource_authority",
+          "status": "not_applicable",
+          "severity": "none",
+          "reason": "Not applicable: component entities carry no minter/burner/freezer/recaller role keys (those are resource-manager-specific).",
+          "evidence": {
+            "entity_kind": "component"
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "package_upgrade",
+          "status": "informational",
+          "severity": "informational",
+          "reason": "No prior scan exists to compare against -- this run establishes the baseline for future upgrade detection. A clean reading here is not yet a claim of 'unchanged'.",
+          "evidence": {
+            "package_address": "package_rdx1phm53al5ztrfw8k5wa3qc5pllwfyeqgl4spjcy83ymgw8jhngx7vu3",
+            "blueprint_name": "BadgeManager",
+            "blueprint_version": "1.0.0",
+            "baseline": null
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "metadata_claims",
+          "status": "informational",
+          "severity": "low",
+          "reason": "Metadata gap(s): missing expected metadata field(s) for a component: ['name'].",
+          "evidence": {
+            "metadata.name": null,
+            "metadata.symbol": null,
+            "metadata.description": null,
+            "metadata.icon_url": null,
+            "metadata.info_url": null
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        }
+      ]
+    },
+    {
+      "id": "guild-badge-factory",
+      "project": "Radix Guild",
+      "category": "guild",
+      "address": "component_rdx1cqlakjp65k8zkznynynsqpjcu7fwt9zcdvee358p948wp9h4n2km99",
+      "entity_kind": "component",
+      "label": "Guild Badge Factory",
+      "checks": [
+        {
+          "check": "dapp_definition_two_way",
+          "status": "fail",
+          "severity": "medium",
+          "reason": "Half-pair (reverse direction): entity does not name a dApp Definition itself, but account_rdx12yh4fwevmvnqgd3ppzau66cm9xu874srmrt9g2cye3fa8j8y78z9sq lists this entity in its own claimed_entities. Being claimed is not the same as claiming back.",
+          "evidence": {
+            "metadata.dapp_definition(s)": null,
+            "reverse_claimed_by": [
+              "account_rdx12yh4fwevmvnqgd3ppzau66cm9xu874srmrt9g2cye3fa8j8y78z9sq"
+            ]
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "owner_role",
+          "status": "informational",
+          "severity": "informational",
+          "reason": "Owner role is protected by a fixed requirement with no rotation path (updater: None) -- if the required badge/key is ever lost or compromised, the owner rule can never be repointed. A common and often-intentional pattern; not provably wrong from chain data alone, so this stays informational rather than a guessed fail.",
+          "evidence": {
+            "role_assignments.owner.rule.type": "Protected",
+            "role_assignments.owner.updater": "None"
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "resource_authority",
+          "status": "not_applicable",
+          "severity": "none",
+          "reason": "Not applicable: component entities carry no minter/burner/freezer/recaller role keys (those are resource-manager-specific).",
+          "evidence": {
+            "entity_kind": "component"
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "package_upgrade",
+          "status": "informational",
+          "severity": "informational",
+          "reason": "No prior scan exists to compare against -- this run establishes the baseline for future upgrade detection. A clean reading here is not yet a claim of 'unchanged'.",
+          "evidence": {
+            "package_address": "package_rdx1ph03wnq9x4q9z9ufc2anrrmeeu03fu92uk9wkyr8fg50rdgxut2wtd",
+            "blueprint_name": "BadgeFactory",
+            "blueprint_version": "1.0.0",
+            "baseline": null
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        },
+        {
+          "check": "metadata_claims",
+          "status": "pass",
+          "severity": "none",
+          "reason": "Metadata present and internally consistent: expected string fields are set, and any icon_url/info_url present is correctly typed as Url.",
+          "evidence": {
+            "metadata.name": "Radix Badge Factory",
+            "metadata.symbol": null,
+            "metadata.description": "Permissionless badge infrastructure for Radix",
+            "metadata.icon_url": null,
+            "metadata.info_url": null
+          },
+          "embargo": {
+            "status": "public",
+            "publish_at": null,
+            "reason": null
+          },
+          "state_version": 557840622
+        }
+      ]
+    }
+  ]
+}

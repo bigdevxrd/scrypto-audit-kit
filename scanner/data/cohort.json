@@ -1,0 +1,49 @@
+{
+  "cohort_version": "2026-09-09.1",
+  "notes": [
+    "This is the public cohort: only the entities the Guild operates itself. The scanner's full cohort (which also covers a small set of external projects, run locally, never committed) withholds every non-Guild row from anything this repository publishes -- see docs/posture-scanner.md#embargo. Guild rows are first-class here: the scanner holds us to the same standard as anyone else, and does not exempt us from a failing result."
+  ],
+  "entities": [
+    {
+      "id": "guild-dapp-definition-account",
+      "project": "Radix Guild",
+      "category": "guild",
+      "address": "account_rdx12yh4fwevmvnqgd3ppzau66cm9xu874srmrt9g2cye3fa8j8y78z9sq",
+      "entity_kind": "account",
+      "label": "Radix Guild dApp Definition account",
+      "role": "dapp_definition_hub"
+    },
+    {
+      "id": "guild-badge-manager",
+      "project": "Radix Guild",
+      "category": "guild",
+      "address": "component_rdx1czexylvvm0q4uhwpjaqmlznj9sd3y2jnmmah6qug9lm9sfm3tyrtva",
+      "entity_kind": "component",
+      "label": "Guild Badge Manager"
+    },
+    {
+      "id": "guild-badge-factory",
+      "project": "Radix Guild",
+      "category": "guild",
+      "address": "component_rdx1cqlakjp65k8zkznynynsqpjcu7fwt9zcdvee358p948wp9h4n2km99",
+      "entity_kind": "component",
+      "label": "Guild Badge Factory"
+    },
+    {
+      "id": "guild-escrow-wave-b",
+      "project": "Radix Guild",
+      "category": "guild",
+      "address": "component_rdx1czka54tdxyva098x7djgdsqplt63n9qdglep47atkzpml45hp88yly",
+      "entity_kind": "component",
+      "label": "Guild Escrow (Wave B, live since 2026-09-13)"
+    },
+    {
+      "id": "guild-dapp-definition-2",
+      "project": "Radix Guild",
+      "category": "guild",
+      "address": "account_rdx12yepj6wme9ehcnmffk9fvelhumrfskzqyxdy6zde8ltn5zxy42mrcz",
+      "entity_kind": "account",
+      "label": "Radix Guild dApp definition 2 (Wave B)"
+    }
+  ]
+}
