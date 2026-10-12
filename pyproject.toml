@@ -68,10 +68,10 @@ dependencies = []
 # what bin/mcp_server.py imports. Without the bound pip resolves 2.x and `sak-mcp` dies with
 # "needs the MCP SDK: pip install mcp[cli]" — the exact thing the user just ran. Lifting it
 # requires porting the server to the 2.x entry point first.
-mcp = ["mcp[cli]>=1.0,<2; python_version >= '3.10'"]   # the MCP server (sak-mcp) — needs 3.10+
+mcp = ["mcp[cli]>=1.0,<3; python_version >= '3.10'"]   # the MCP server (sak-mcp) — needs 3.10+
 schema = ["jsonschema>=4.0"]     # opt-in report/contract schema validation
 llm = ["anthropic>=0.40"]        # the default claude-api audit backend (bin/llm_audit.py)
-dev = ["jsonschema>=4.0", "mcp[cli]>=1.0,<2; python_version >= '3.10'"]
+dev = ["jsonschema>=4.0", "mcp[cli]>=1.0,<3; python_version >= '3.10'"]
 
 [project.urls]
 Homepage = "https://github.com/bigdevxrd/scrypto-audit-kit"
