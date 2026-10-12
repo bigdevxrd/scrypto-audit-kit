@@ -1022,9 +1022,9 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "radix-blueprint-schema-init"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2b054551800f5ea837eabffa83f3a93c49b0a9e2b2a52a3a3689b3c981fcab7"
+checksum = "8953875fc2ff6dedc7152f271abd259daf3321c68bd2dcce1349bdd7593712ef"
 dependencies = [
  "bitflags 1.3.2",
  "radix-common",
@@ -1034,9 +1034,9 @@ dependencies = [
 
 [[package]]
 name = "radix-common"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ff82e84dd409e4fecf2ad8eaf350d42c0efc4a25d1e102fbd640c12d8d90585"
+checksum = "0f67852ef063fce0dbf8b453a46969cdec22442f4daee633809521075c850325"
 dependencies = [
  "bech32",
  "blake2",
@@ -1061,9 +1061,9 @@ dependencies = [
 
 [[package]]
 name = "radix-common-derive"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2762a06040e35a125dd23c4a97e5f2bf14a3d73069031d22e8e8fb4c3c771d82"
+checksum = "c6dfb14313f30f858c16a9d7e2e02c798fab7e8f34f02c0206c225f25693c59f"
 dependencies = [
  "paste",
  "proc-macro2",
@@ -1074,9 +1074,9 @@ dependencies = [
 
 [[package]]
 name = "radix-engine"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ad6651220406b5055e6d60b6f9901e3936519d6a7d2c17ff46fa8cb494bd3fc"
+checksum = "2911c7766a891750982f905c4dddb75c717db13c10e46706d3bea4561ebdc18b"
 dependencies = [
  "bitflags 1.3.2",
  "colored",
@@ -1107,9 +1107,9 @@ dependencies = [
 
 [[package]]
 name = "radix-engine-interface"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79432ee345c00faeb36ffb5e4f83e0c2aa87bfafa290d21808e6dbb673b63f7a"
+checksum = "3294b26fe61b4d64df08f133bbd256a8f44dccff01961837a2afdd01e55ea45f"
 dependencies = [
  "bitflags 1.3.2",
  "const-sha1",
@@ -1129,18 +1129,18 @@ dependencies = [
 
 [[package]]
 name = "radix-engine-profiling"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f55cf2701f6fa50507984c2b7c5d9da725ac9082ffa5b3ac282fe007da0888d9"
+checksum = "0d26e649354facb2f86e77527032f57825f2e3d673660f73b0f58cdd1aa4e4f9"
 dependencies = [
  "fixedstr",
 ]
 
 [[package]]
 name = "radix-engine-profiling-derive"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bba634817796410e9eb5cb425b74177cacc6826310148fa268e3e4340472754"
+checksum = "45989f75df6b9ab42c90ab50d1e8fcf3fae6bea15d35154a360f6c606fba4c80"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1150,9 +1150,9 @@ dependencies = [
 
 [[package]]
 name = "radix-native-sdk"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa1da2296c5de0d4a94cf62584d20e5924806cadb1cc80c28082aa2fc649f97d"
+checksum = "7d577fe3152196620d340b01c8eb92729efe470d122ab25f85971eadba0c9cc9"
 dependencies = [
  "radix-common",
  "radix-engine-interface",
@@ -1162,9 +1162,9 @@ dependencies = [
 
 [[package]]
 name = "radix-rust"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f1c59284c7f1703dc774a185cb112666336abffc1773a274e921a8f953ee5eb"
+checksum = "0ed9c16d6f639d4d0933736c74dc33c8db597537c15d25e7f34ca77e61c50d96"
 dependencies = [
  "indexmap 2.14.0",
  "preinterpret",
@@ -1173,9 +1173,9 @@ dependencies = [
 
 [[package]]
 name = "radix-sbor-derive"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91c0199d89d18c39e57a1945b06220776d7e88bafdba6ad309ebf3959b32de4e"
+checksum = "d8e83ac9f5df4774b4988daf5c79d83797b6421e645f9900c189002876f91529"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1185,9 +1185,9 @@ dependencies = [
 
 [[package]]
 name = "radix-substate-store-impls"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330542e041398dc9d23e600ddb5d79092d998b195592dfa8a81361fab35cf801"
+checksum = "e1fa1f2cc7cc599a0ef04e61e99e67008f03cc1de61dd1c55a611523fd9194c3"
 dependencies = [
  "hex",
  "itertools",
@@ -1199,9 +1199,9 @@ dependencies = [
 
 [[package]]
 name = "radix-substate-store-interface"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8905e91c3d015f596db6d137bd47c848d2288f1554b441f9da35872d221b792f"
+checksum = "0a22a3ff2e080ae5f739285791d5068885e5fb3622d2584f19640366587d2c5f"
 dependencies = [
  "hex",
  "itertools",
@@ -1212,9 +1212,9 @@ dependencies = [
 
 [[package]]
 name = "radix-substate-store-queries"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccbe94d10999eb318bdce4bfcfedf83aa2b83b25df05f51a1fff43ccca295b1d"
+checksum = "c960089919c14d0821cb3caf09f87942542fdbc2132b3652d2b3121970cfce87"
 dependencies = [
  "hex",
  "itertools",
@@ -1230,9 +1230,9 @@ dependencies = [
 
 [[package]]
 name = "radix-transactions"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "014ee2e9cfbc28a6ac7dc995c3b7e4725df5ee19c63d0375ab082aee7dab85b1"
+checksum = "33cd9562da1a0ca2c8fe77cc2bc67f318bdabdb52b6cdda022417039e809a28c"
 dependencies = [
  "annotate-snippets",
  "bech32",
@@ -1355,9 +1355,9 @@ dependencies = [
 
 [[package]]
 name = "sbor"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0866881494db245e34e97637b0956cdc1db3a2fe0c72d0fa3bf834bb9687939"
+checksum = "ceb64afd667be2e70f59996d6af6b300e81f6cb3ef6c4ee505022b402df4794d"
 dependencies = [
  "const-sha1",
  "hex",
@@ -1370,9 +1370,9 @@ dependencies = [
 
 [[package]]
 name = "sbor-derive"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c452bd0a73301aea1471b40e980ecbc0e2a48be77121c9c14dd9ca6a4c1cbc"
+checksum = "28b8cf430bf202115773b53755ab9a046518652a7d337dd43c8c6dd75de7daab"
 dependencies = [
  "proc-macro2",
  "sbor-derive-common",
@@ -1381,9 +1381,9 @@ dependencies = [
 
 [[package]]
 name = "sbor-derive-common"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93d80799f04c0bed48ac6586bebcaca547c68300d1e08e1047dce5ccdc71bd88"
+checksum = "0e43bdbc29942703ce602dac39938f00db81b777e40ce03a29325b731f66a647"
 dependencies = [
  "const-sha1",
  "indexmap 2.14.0",
@@ -1416,9 +1416,9 @@ checksum = "d68f2ec51b097e4c1a75b681a8bec621909b5e91f15bb7b840c4f2f7b01148b2"
 
 [[package]]
 name = "scrypto"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd222694326d1b7efde06206e16892f0128609632f103832029cac9da6a82257"
+checksum = "e13ad0a791a531d81ab47730df06038862ab73770fb7443b69b074c96e658a77"
 dependencies = [
  "bech32",
  "const-sha1",
@@ -1437,9 +1437,9 @@ dependencies = [
 
 [[package]]
 name = "scrypto-compiler"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02093dcb9437349b5274c7c591ed92d7135090c687cfd28d5fdcc1f9de8e491c"
+checksum = "889d4de22fdb0bfbf28393ba57a7240648460cd91f3dc9612fbbdbea94949ac1"
 dependencies = [
  "cargo_toml",
  "fslock",
@@ -1455,9 +1455,9 @@ dependencies = [
 
 [[package]]
 name = "scrypto-derive"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f44b3ca2a0e902a804769eb0f533b630626967f083cfb225e518ae072f16582f"
+checksum = "42244052aa8f58ed4e85e2f75c31df37f9a11284034a14653a2c64f7cc668b64"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1472,9 +1472,9 @@ dependencies = [
 
 [[package]]
 name = "scrypto-test"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "658bfea4564a6622c38967a69724cd5a8d67c684654bedf1eff241f82a2a6c76"
+checksum = "c4dbdb050a5c891b8e5a8a0c33a1b1ceaf0a0df5e4124ec70c5cabab4b0f6657"
 dependencies = [
  "ouroboros",
  "paste",
