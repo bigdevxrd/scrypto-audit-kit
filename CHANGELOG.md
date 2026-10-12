@@ -6,7 +6,7 @@ stamped into every report; this log follows [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
-## [0.8.1] — 2026-10-18
+## [0.8.1] — 2026-10-12
 
 Everything in this section is new since v0.8.0 (2026-08-15). The posture scanner (`scanner/`)
 sits outside the packaged `bin/` tree, so it ships in the **sdist** but **not in the wheel**:
