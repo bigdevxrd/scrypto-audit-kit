@@ -81,7 +81,7 @@ channel you used — and it'll get picked up.
 | Version | Supported |
 |---|---|
 | `main` (git clone) | yes |
-| 0.8.x — latest release `v0.8.1`, 2026-10-18 (PyPI) | yes |
+| 0.8.x — latest release `v0.8.1`, 2026-10-12 (PyPI) | yes |
 | ≤ 0.7.x | no |
 
 Two known issues are already public rather than embargoed, so they belong here, both in the

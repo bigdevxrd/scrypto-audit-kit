@@ -8,9 +8,9 @@
 
 Pre-audit harness for [Scrypto](https://docs.radixdlt.com/docs/scrypto-1) blueprints on the Radix network. Runs a **hybrid analysis** — deterministic static rules plus an LLM pass over a curated checklist + reference patterns — and produces a findings report (markdown + JSON) you can hand to a human auditor (or use to fix issues yourself). The static pass alone is free and needs no API key. This is a **pre-audit** tool, not an audit: it catches the kinds of issues a careful reviewer would catch on a first read so that paid auditors can spend their time on the harder, second-read findings, and **it does not replace a human audit before mainnet deployment.**
 
-## Status *(as of 2026-10-18)*
+## Status *(as of 2026-10-12)*
 
-- **Version:** alpha. The latest release is **v0.8.1**, tagged 2026-10-18 and published on [PyPI](https://pypi.org/project/scrypto-audit-kit/). Anything that lands on `main` after it is listed under [CHANGELOG → Unreleased](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/CHANGELOG.md), and this README marks those parts *main only*.
+- **Version:** alpha. The latest release is **v0.8.1**, tagged 2026-10-12 and published on [PyPI](https://pypi.org/project/scrypto-audit-kit/). Anything that lands on `main` after it is listed under [CHANGELOG → Unreleased](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/CHANGELOG.md), and this README marks those parts *main only*.
 - **Run it:** `pip install scrypto-audit-kit`, then `sak-static path/to/your/package` — the free static pass, no API key. The full LLM audit (`./audit.sh`) runs from a clone — see [Quickstart](#quickstart).
 - **Who it is for:** Scrypto developers who want a cheap first read of a blueprint before paying for an audit; reviewers who want a checklist-driven starting point; and agent builders who want audit tools over MCP or a Python SDK.
 - **Who maintains it:** one person, `bigdev` ([@bigdevxrd](https://github.com/bigdevxrd)). Independent; no affiliation with, endorsement by, or backing from the Radix Foundation, RDX Works or the Radix DAO.

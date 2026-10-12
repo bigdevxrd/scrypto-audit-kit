@@ -47,7 +47,7 @@ code from the package you are auditing run inside your CI job:
   run dies mid-audit on a missing `anthropic`. (`v0.5.0` predates that backend — only the
   injection affects it.)
 
-`v0.8.1` was tagged on 2026-10-18. To pin a commit SHA instead of a tag, take one from the kit's
+`v0.8.1` was tagged on 2026-10-12. To pin a commit SHA instead of a tag, take one from the kit's
 `main` at or after that tag — a SHA is just as reproducible, and one from before the tag carries
 the vulnerable workflow.
 
