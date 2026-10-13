@@ -3,7 +3,7 @@
 Guidance for AI agents working with this repo. (Human contributors: see
 [CONTRIBUTING.md](CONTRIBUTING.md).)
 
-`scrypto-audit-kit` is a **pre-audit** toolkit for [Scrypto](https://docs.radixdlt.com/docs/scrypto-1)
+`scrypto-audit-kit` is a **pre-audit** toolkit for [Scrypto](https://docs.radixdlt.com/docs/scrypto)
 blueprints on Radix. Use it to help a user security-review and harden a Scrypto
 package before they pay for a human audit. It is rung L1–L3 of a trust ladder, not
 a safety guarantee — see [VISION.md](VISION.md). Never tell a user their code is "safe";

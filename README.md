@@ -2,11 +2,11 @@
 
 [![lint](https://github.com/bigdevxrd/scrypto-audit-kit/actions/workflows/lint.yml/badge.svg)](https://github.com/bigdevxrd/scrypto-audit-kit/actions/workflows/lint.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/LICENSE)
-[![Scrypto · Radix](https://img.shields.io/badge/Scrypto-Radix-052CC0)](https://docs.radixdlt.com/docs/scrypto-1)
+[![Scrypto · Radix](https://img.shields.io/badge/Scrypto-Radix-052CC0)](https://docs.radixdlt.com/docs/scrypto)
 [![status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#limitations--read-this-before-relying-on-the-output)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/CONTRIBUTING.md)
 
-Pre-audit harness for [Scrypto](https://docs.radixdlt.com/docs/scrypto-1) blueprints on the Radix network. Runs a **hybrid analysis** — deterministic static rules plus an LLM pass over a curated checklist + reference patterns — and produces a findings report (markdown + JSON) you can hand to a human auditor (or use to fix issues yourself). The static pass alone is free and needs no API key. This is a **pre-audit** tool, not an audit: it catches the kinds of issues a careful reviewer would catch on a first read so that paid auditors can spend their time on the harder, second-read findings, and **it does not replace a human audit before mainnet deployment.**
+Pre-audit harness for [Scrypto](https://docs.radixdlt.com/docs/scrypto) blueprints on the Radix network. Runs a **hybrid analysis** — deterministic static rules plus an LLM pass over a curated checklist + reference patterns — and produces a findings report (markdown + JSON) you can hand to a human auditor (or use to fix issues yourself). The static pass alone is free and needs no API key. This is a **pre-audit** tool, not an audit: it catches the kinds of issues a careful reviewer would catch on a first read so that paid auditors can spend their time on the harder, second-read findings, and **it does not replace a human audit before mainnet deployment.**
 
 ## Status *(as of 2026-10-12)*
 
@@ -338,7 +338,7 @@ See [CONTRIBUTING.md](https://github.com/bigdevxrd/scrypto-audit-kit/blob/main/C
 
 ## Related
 
-- [Radix Scrypto docs](https://docs.radixdlt.com/docs/scrypto-1)
+- [Radix Scrypto docs](https://docs.radixdlt.com/docs/scrypto)
 - [radixdlt/Ignition](https://github.com/radixdlt/Ignition) — the canonical Radix-team-maintained reference codebase (most of our `references/ignition-patterns.md` extracts from here)
 - [caviarnine/caviarnine-scrypto](https://github.com/caviarnine/caviarnine-scrypto) — Apache-licensed CaviarNine production blueprints
 - [aider](https://aider.chat) — one of the kit's LLM backends (`--backend aider`); the default backend calls the Anthropic API directly
