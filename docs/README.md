@@ -1,6 +1,6 @@
 # Documentation
 
-`scrypto-audit-kit` is a **pre-audit** toolkit for [Scrypto](https://docs.radixdlt.com/docs/scrypto-1)
+`scrypto-audit-kit` is a **pre-audit** toolkit for [Scrypto](https://docs.radixdlt.com/docs/scrypto)
 blueprints on Radix — a deterministic static pass plus an LLM checklist pass that produce a
 machine-readable findings report. It is the entry rungs (L1–L3) of a
 [trust ladder](../VISION.md) that ends at a human audit; it does not replace one.
