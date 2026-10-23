@@ -33,6 +33,11 @@ on:
       ANTHROPIC_API_KEY:
         required: true
 
+# Default for any job without its own block. The pre-audit job below sets its
+# own (it overrides this one), so this changes nothing for it today.
+permissions:
+  contents: read
+
 jobs:
   pre-audit:
     runs-on: ubuntu-latest
