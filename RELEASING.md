@@ -79,7 +79,8 @@ version follows.
    Options → Yank**, with a short reason. A yanked version stays downloadable, so existing
    exact pins still resolve, but `pip` no longer picks it for a range such as
    `scrypto-audit-kit>=0.8` or for an unpinned install. Prefer yank to delete: a deleted
-   version's file names can never be reused, and a pin to it breaks without a message.
+   version's file names can never be reused, and a pin to it fails with a bare "no matching
+   distribution" error that gives no reason.
 2. **Mark the GitHub Release.** Edit the release for that tag: put a warning at the top of the
    notes that names the version to use instead and links the issue. Leave the tag in place.
 3. **Cut the fix as the next patch version** (for example `0.8.1` → `0.8.2`) by the steps in

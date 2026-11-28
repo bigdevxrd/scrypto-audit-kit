@@ -17,10 +17,10 @@ the Rust attestation crate. Command-line flags win over the environment wherever
 | `AIDER_ENV_FILE` | `audit.sh:131-134` | no (the file it names holds secrets) | Path to an env file that `audit.sh` sources when `ANTHROPIC_API_KEY` is not already set | unset; then a `.env` in the kit directory is tried |
 | `SAK_BACKEND` | `audit.sh:87-89` | no | LLM backend: `claude-api`, `aider` or `cmd` ([backends.md](backends.md)). `--backend` wins | `claude-api` |
 | `SAK_BACKEND_CMD` | `audit.sh:101-103` | no | The command the `cmd` backend runs. `--backend-cmd` wins | none: required for `--backend cmd` |
-| `SAK_MODEL` | `bin/llm_audit.py:362` | no | Anthropic model id for the `claude-api` backend. `--model` wins | `DEFAULT_MODEL` in `bin/llm_audit.py` |
+| `SAK_MODEL` | `bin/llm_audit.py:362` | no | Anthropic model id, read only when `bin/llm_audit.py` is run on its own. `audit.sh` always passes `--model` (`audit.sh:345-350`), so with `audit.sh` set the model with `./audit.sh --model`. (`audit.sh` also sets `SAK_MODEL` for the `cmd` backend; see below.) | `DEFAULT_MODEL` in `bin/llm_audit.py` |
 | `SAK_MAX_TOKENS` | `bin/llm_audit.py:370` | no | Output token cap for the `claude-api` backend. Must be an integer | `DEFAULT_MAX_TOKENS` in `bin/llm_audit.py` |
 | `SAK_HOME` | `bin/mcp_server.py:40`; `bin/dapp_scope.py:63` | no | Path to a kit clone (a folder with `audit.sh`), so a pip-installed MCP server or `sak-dapp-scope` can find the kit's resources | the folder found by walking up from the installed file |
-| `TMPDIR` | `audit.sh:294` | no | Where `audit.sh` writes its temporary prompt file | `/tmp` |
+| `TMPDIR` | `audit.sh:294,440` | no | Where `audit.sh` writes its temporary prompt files | `/tmp` |
 
 ### Names the kit sets or removes, but does not read
 
@@ -44,9 +44,9 @@ variables as well. They are not listed here.
 | `PII_BLOCKLIST_JSON` | **yes** | The private blocklist, as JSON. Supplied as a repository secret |
 | `PII_BLOCKLIST_LOCAL_PATH` | no (the file it names is private) | Path to a local blocklist file, used when `PII_BLOCKLIST_JSON` is unset |
 | `LEAK_GATE_AUDIT_ALLOW` | no | Regular expression of audit-shaped paths that are allowed |
-| `LEAK_GATE_BASE` | no | Base ref to compare against |
+| `LEAK_GATE_BASE` | no | Base ref to compare against (default: `origin/$GITHUB_BASE_REF`, else the push event's `before`, else `origin/main`; `leak-gate.mjs:170`) |
 | `LEAK_GATE_HEAD` | no | Head ref to check (default `HEAD`) |
-| `LEAK_GATE_BRANCH` | no | Branch name to judge when not running on GitHub |
+| `LEAK_GATE_BRANCH` | no | An extra branch name to check, read on every run with GitHub's refs; meant for local runs, where those are unset |
 | `GITHUB_EVENT_PATH` | no | Set by GitHub Actions: the event payload |
 | `GITHUB_REF` | no | Set by GitHub Actions |
 | `GITHUB_HEAD_REF` | no | Set by GitHub Actions on pull requests |
