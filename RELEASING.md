@@ -66,6 +66,41 @@ as a repo secret.
    against the tagged tree, checks the tag matches `VERSION`, builds the sdist + wheel,
    smoke-tests both, and only then publishes to PyPI.
 
+## Withdrawing a bad release
+
+Not yet needed for any release: nothing below has been run. Use it when a published version is
+broken (it crashes, misreports, or gives a wrong verdict) or unsafe to run.
+
+The tag cannot be moved or deleted (step 4 above), and a version number on PyPI cannot be
+uploaded twice. So a bad release is never replaced in place: it is marked, and a fixed patch
+version follows.
+
+1. **Yank it on PyPI.** On the project's PyPI page: **Manage → Releases → the bad version →
+   Options → Yank**, with a short reason. A yanked version stays downloadable, so existing
+   exact pins still resolve, but `pip` no longer picks it for a range such as
+   `scrypto-audit-kit>=0.8` or for an unpinned install. Prefer yank to delete: a deleted
+   version's file names can never be reused, and a pin to it breaks without a message.
+2. **Mark the GitHub Release.** Edit the release for that tag: put a warning at the top of the
+   notes that names the version to use instead and links the issue. Leave the tag in place.
+3. **Cut the fix as the next patch version** (for example `0.8.1` → `0.8.2`) by the steps in
+   "Cutting a release". Its CHANGELOG entry says which version it replaces and why.
+4. **Tell users.** Open an issue, or a GitHub security advisory if the problem is a security
+   one (see [SECURITY.md](SECURITY.md)), naming the bad version, the good version and what a
+   report made with the bad one may have got wrong.
+5. **Move the CI floor.** If the bad version is the one [docs/ci.md](docs/ci.md) and the
+   README tell users to pin, update those pins in the patch release's PR.
+
+### What users should pin
+
+- **PyPI:** pin an exact version, `scrypto-audit-kit==<version>`, and change it on purpose.
+  An exact pin to a yanked version still installs, so watch the release notes or the issue.
+- **The reusable CI workflow:** pin both the `uses:` ref and `kit-ref` to a release tag
+  ([docs/ci.md](docs/ci.md)). Release tags cannot move, so a pinned tag always means the same
+  code. To roll back after a bad release, set both back to the last good tag.
+- **A clone:** check out a release tag, not `main`.
+- Each `report.json` records the kit version that made it, so a report made with a withdrawn
+  version can be found and re-run.
+
 ## Verify the published release
 
 ```bash
